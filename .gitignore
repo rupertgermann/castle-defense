@@ -4,3 +4,4 @@ work/.npm-cache
 outputs/dev-*.html
 work/.bundle-*
 work/shots/
+.claude/
