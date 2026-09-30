@@ -14,7 +14,7 @@ const errors = [];
 page.on('pageerror', e => errors.push('pageerror: ' + e.message));
 page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') errors.push(m.type() + ': ' + m.text()); });
 await page.goto(pathToFileURL(`${process.cwd()}/outputs/${name}.html`).href);
-await page.waitForFunction(() => window.__sceneReady === true, { timeout: 120000 });
+await page.waitForFunction(() => window.__sceneReady === true, null, { timeout: 120000 });
 await page.waitForTimeout(1500);
 if (opt('--eval')) await page.evaluate(`(async () => { ${opt('--eval')} })()`);
 await page.waitForTimeout(Number(opt('--wait') || 1000));
