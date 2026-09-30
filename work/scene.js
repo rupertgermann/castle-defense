@@ -124,18 +124,19 @@ const materials = {
 };
 const unitBox = new RoundedBoxGeometry(1, 1, 1, 1, .055);
 const temp = new THREE.Object3D(), batches = new Map();
-function instance(geometry, material, x, y, z, sx = 1, sy = 1, sz = 1, ry = 0, color = null, rx = 0, rz = 0) {
+export function instance(geometry, material, x, y, z, sx = 1, sy = 1, sz = 1, ry = 0, color = null, rx = 0, rz = 0) {
   const key = geometry.uuid + material.uuid;
   if (!batches.has(key)) batches.set(key, { geometry, material, transforms: [], colors: [] });
   const batch = batches.get(key);
   temp.position.set(x, y, z); temp.rotation.set(rx, ry, rz); temp.scale.set(sx, sy, sz); temp.updateMatrix();
   batch.transforms.push(temp.matrix.clone()); batch.colors.push(color);
+  return { batch, index: batch.transforms.length - 1 };
 }
 function finishInstances() {
   for (const b of batches.values()) {
     const m = new THREE.InstancedMesh(b.geometry, b.material, b.transforms.length);
     b.transforms.forEach((t, i) => { m.setMatrixAt(i, t); if (b.colors[i]) m.setColorAt(i, b.colors[i]); });
-    m.castShadow = m.receiveShadow = true; m.computeBoundingSphere(); scene.add(m);
+    m.castShadow = m.receiveShadow = true; m.computeBoundingSphere(); scene.add(m); b.mesh = m;
   }
 }
 function worldUV(g, scale = 6) {
@@ -218,7 +219,7 @@ const bounce = new THREE.DirectionalLight('#9cbacb', .35); bounce.position.set(6
 const envScene = new THREE.Scene();
 envScene.add(new THREE.Mesh(sky.geometry, sky.material));
 const pmrem = new THREE.PMREMGenerator(renderer);
-scene.environment = pmrem.fromScene(envScene, .08, .1, 1200).texture;
+scene.environment = pmrem.fromScene(envScene, .04, .1, 1200).texture;
 scene.environmentIntensity = .28; pmrem.dispose();
 
 // All architectural openings use holes in the wall mesh, with their reveals exposed.
@@ -465,10 +466,9 @@ function pathRibbon(points, width, mat) {
   }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(indices); g.computeVertexNormals(); const m = mesh(g, mat); m.castShadow = false;
 }
-const pathMat = new THREE.MeshStandardMaterial({ color: '#ac9c79', roughness: 1, bumpMap: stoneMaps.bumpMap, bumpScale: .055 });
+const pathMat = new THREE.MeshStandardMaterial({ color: '#ac9c79', roughness: 1, bumpMap: stoneMaps.bumpMap, bumpScale: .055, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
 pathRibbon([[-9, 28], [-10, 41], [1, 54], [26, 56], [48, 53], [64, 52]], 4.5, pathMat);
 pathRibbon([[99, 51], [116, 56], [137, 76], [163, 123], [160, 200]], 5, pathMat);
-pathRibbon([[2, 52], [6, 75], [13, 100], [14, 152], [-6, 218], [-20, 320]], 4.4, pathMat);
 
 function bridge() {
   const z = 52, x0 = 57, x1 = 104, h = 9.8, group = new THREE.Group(); group.position.z = z; scene.add(group);
@@ -625,12 +625,10 @@ for (let i = 0; i < 5200; i++) {
   if (r < 120 && (noise(x * .035, z * .035) < .59 || rand() < .5)) continue;
   if (r > 120 && noise(x * .025 + 3, z * .025) < .3) continue;
   const s = between(.75, 1.2) * (r > 170 ? 1.15 : 1), rot = rand() * 6.283, template = r < 115 ? trees[i % trees.length] : farTrees[i % farTrees.length];
-  instance(template.bark, barkMaterial, x, y - .2, z, s, s, s, rot);
-  instance(template.foliage, leafMaterial, x, y - .2, z, s, s, s, rot);
-  treeLocations.push([x, z, s]);
+  treeLocations.push([x, z, s, instance(template.bark, barkMaterial, x, y - .2, z, s, s, s, rot), instance(template.foliage, leafMaterial, x, y - .2, z, s, s, s, rot)]);
 }
 for (const [x, z, s, kind] of [[-40, 34, 1.05, 0], [36, 24, .75, 1], [-27, 53, .85, 2], [27, 48, .95, 0], [-46, -17, 1.1, 0], [39, -24, 1.1, 1], [4, -40, .9, 2], [-55, 90, 1.15, 0], [31, 115, .7, 1]]) {
-  const t = trees[kind]; instance(t.bark, barkMaterial, x, height(x, z) - .2, z, s, s, s, x); instance(t.foliage, leafMaterial, x, height(x, z) - .2, z, s, s, s, x);
+  const t = trees[kind]; treeLocations.push([x, z, s, instance(t.bark, barkMaterial, x, height(x, z) - .2, z, s, s, s, x), instance(t.foliage, leafMaterial, x, height(x, z) - .2, z, s, s, s, x)]);
 }
 
 const grassPositions = [], grassColors = [], grassColor = new THREE.Color();
@@ -706,13 +704,17 @@ composer.addPass(grade); composer.addPass(new OutputPass());
 const fxaa = new ShaderPass(FXAAShader); composer.addPass(fxaa);
 
 const start = performance.now();
-let lastFrame = 0, frameCount = 0;
+let lastFrame = start, frameCount = 0;
+// Game systems register here; called every frame with (dt seconds, elapsed seconds).
+export const frameHooks = [];
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 function render(now) {
   requestAnimationFrame(render);
-  if (document.hidden || now - lastFrame < 1000 / 35) return;
+  if (document.hidden) { lastFrame = now; return; }
+  const dt = Math.min(.1, Math.max(0, now - lastFrame) * .001);
   lastFrame = now;
   const time = (now - start) * .001;
+  for (const hook of frameHooks) hook(dt, time);
   controls.update();
   if (!reducedMotion) {
     water.material.uniforms.time.value = time * .28;
@@ -756,3 +758,21 @@ renderer.domElement.addEventListener('keydown', e => {
   e.preventDefault(); camera.position.copy(controls.target).add(new THREE.Vector3().setFromSpherical(spherical)); controls.update();
 });
 window.__castle = { renderer, camera, controls, scene, stats: () => ({ frames: frameCount, triangles: renderer.info.render.triangles, calls: renderer.info.render.calls, camera: camera.position.toArray(), distance: camera.position.distanceTo(controls.target), trees: treeLocations.length, ready: window.__sceneReady === true }) };
+
+// Hides every tree within radius of (x, z), e.g. to clear a build site. Shadows refresh on the next frame.
+const hidden = new THREE.Matrix4().makeScale(0, 0, 0);
+export function clearTrees(x, z, radius) {
+  for (const t of treeLocations) {
+    if (t.hidden || Math.hypot(t[0] - x, t[1] - z) > radius) continue;
+    t.hidden = true;
+    for (const ref of [t[3], t[4]]) { ref.batch.mesh.setMatrixAt(ref.index, hidden); ref.batch.mesh.instanceMatrix.needsUpdate = true; }
+  }
+  renderer.shadowMap.needsUpdate = true;
+}
+export const pathPoints = {
+  gateRoad: [[-9, 28], [-10, 41], [1, 54], [26, 56], [48, 53], [64, 52]],
+  eastRoad: [[99, 51], [116, 56], [137, 76], [163, 123], [160, 200]],
+  southRoad: [[2, 52], [6, 75], [13, 100], [14, 152], [-6, 218], [-20, 320]],
+};
+export const bridgeDeck = { x0: 57, x1: 104, z: 52, halfWidth: 3.1, y: 9.925 };
+export { THREE, roadX, scene, camera, controls, renderer, composer, sun, terrain, water, materials, stoneMaps, height, riverX, riverWidth, noise, fbm, BASE, gateCenter, treeLocations, box, cylinder, beam, tiledCone, pitchedRoof, facade, mesh, worldUV, unitBox, initialPosition };

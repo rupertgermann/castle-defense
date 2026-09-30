@@ -1,3 +1,6 @@
 work/node_modules
 work/.npm-cache
 *.png
+outputs/dev-*.html
+work/.bundle-*
+work/shots/
