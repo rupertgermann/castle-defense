@@ -219,7 +219,7 @@ const bounce = new THREE.DirectionalLight('#9cbacb', .35); bounce.position.set(6
 const envScene = new THREE.Scene();
 envScene.add(new THREE.Mesh(sky.geometry, sky.material));
 const pmrem = new THREE.PMREMGenerator(renderer);
-scene.environment = pmrem.fromScene(envScene, .04, .1, 1200).texture;
+scene.environment = pmrem.fromScene(envScene, .08, .1, 1200).texture;
 scene.environmentIntensity = .28; pmrem.dispose();
 
 // All architectural openings use holes in the wall mesh, with their reveals exposed.
