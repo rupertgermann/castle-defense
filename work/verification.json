@@ -1,0 +1,44 @@
+{
+  "before": {
+    "frames": 6,
+    "triangles": 1,
+    "calls": 1,
+    "camera": [
+      109,
+      93,
+      143.99999999999994
+    ],
+    "distance": 196.33135256499403,
+    "trees": 803,
+    "ready": true
+  },
+  "rotated": {
+    "frames": 94,
+    "triangles": 1,
+    "calls": 1,
+    "camera": [
+      -36.00831647034647,
+      127.94577370605388,
+      157.21814429105953
+    ],
+    "distance": 196.33135256499423,
+    "trees": 803,
+    "ready": true
+  },
+  "zoomed": {
+    "frames": 99,
+    "triangles": 1,
+    "calls": 1,
+    "camera": [
+      -33.81072609265635,
+      107.34271465292318,
+      124.50722912045762
+    ],
+    "distance": 158.07816681101824,
+    "trees": 803,
+    "ready": true
+  },
+  "externalRequests": 0,
+  "errors": [],
+  "verifiedAt": "2026-09-30T14:01:26.442Z"
+}
