@@ -1,6 +1,7 @@
-// Wave table + spawn schedule. Pure data/logic (no imports), edit freely.
+// Wave tables (one per level) + spawn schedule. Pure data/logic, edit freely.
+import { LEVEL } from '../level.js';
 // Group: { type, count, lane: 0 (south) | 1 (east) | 'alt' (alternate), at: first spawn (s from wave start), every: gap (s), hp?: extra hp multiplier }
-export const WAVES = [
+const CASTLE_WAVES = [
   { name: 'Smoke on the Road', groups: [
     { type: 'raider', count: 6, lane: 0, at: 0, every: 1.6 }] },
   { name: 'Across the River', groups: [
@@ -60,6 +61,70 @@ export const WAVES = [
     { type: 'hound', count: 16, lane: 'alt', at: 20, every: .4 }] },
 ];
 
+// Frostmere: lane 0 = the switchback road up the valley, lane 1 = across the frozen lake. Harder than the river keep:
+// rams and hounds come early, and the lake lane is short and flat.
+const FROST_WAVES = [
+  { name: 'Shapes in the Snow', groups: [
+    { type: 'raider', count: 8, lane: 0, at: 0, every: 1.3 }] },
+  { name: 'Over the Ice', groups: [
+    { type: 'hound', count: 6, lane: 1, at: 0, every: 1 },
+    { type: 'raider', count: 6, lane: 0, at: 3, every: 1.3 }] },
+  { name: 'Wolves of the Pass', groups: [
+    { type: 'hound', count: 12, lane: 'alt', at: 0, every: .6 },
+    { type: 'raider', count: 6, lane: 1, at: 6, every: 1 }] },
+  { name: 'Mailed in Frost', groups: [
+    { type: 'manatarms', count: 6, lane: 0, at: 0, every: 1.6 },
+    { type: 'raider', count: 10, lane: 'alt', at: 2, every: .9 }] },
+  { name: 'The First Ram', groups: [
+    { type: 'ram', count: 1, lane: 0, at: 0, every: 1 },
+    { type: 'manatarms', count: 6, lane: 1, at: 3, every: 1.5 },
+    { type: 'hound', count: 8, lane: 0, at: 8, every: .6 }] },
+  { name: 'Brutes on the Ice', groups: [
+    { type: 'brute', count: 4, lane: 1, at: 0, every: 3 },
+    { type: 'raider', count: 12, lane: 0, at: 2, every: .8 }] },
+  { name: 'Whiteout', groups: [
+    { type: 'hound', count: 20, lane: 'alt', at: 0, every: .4 },
+    { type: 'manatarms', count: 8, lane: 'alt', at: 6, every: 1.2 }] },
+  { name: 'Hammer and Ram', groups: [
+    { type: 'ram', count: 3, lane: 'alt', at: 0, every: 5 },
+    { type: 'brute', count: 4, lane: 0, at: 4, every: 2.5 },
+    { type: 'raider', count: 12, lane: 1, at: 6, every: .7 }] },
+  { name: 'The Ice-Jarl', boss: true, groups: [
+    { type: 'manatarms', count: 10, lane: 1, at: 0, every: 1 },
+    { type: 'warlord', count: 1, lane: 1, at: 8, every: 1, hp: .6 },
+    { type: 'hound', count: 12, lane: 0, at: 2, every: .5 }] },
+  { name: 'Frozen Shieldwall', groups: [
+    { type: 'manatarms', count: 16, lane: 'alt', at: 0, every: .8 },
+    { type: 'brute', count: 5, lane: 'alt', at: 8, every: 2.2 }] },
+  { name: 'Avalanche', groups: [
+    { type: 'hound', count: 24, lane: 'alt', at: 0, every: .3 },
+    { type: 'raider', count: 16, lane: 'alt', at: 5, every: .45 }] },
+  { name: 'Rams Across the Lake', groups: [
+    { type: 'ram', count: 5, lane: 1, at: 0, every: 3.5 },
+    { type: 'brute', count: 6, lane: 0, at: 3, every: 2 },
+    { type: 'manatarms', count: 10, lane: 'alt', at: 8, every: 1 }] },
+  { name: 'The Long Winter', groups: [
+    { type: 'manatarms', count: 18, lane: 0, at: 0, every: .7 },
+    { type: 'brute', count: 8, lane: 1, at: 4, every: 1.7 },
+    { type: 'ram', count: 3, lane: 'alt', at: 12, every: 4 },
+    { type: 'hound', count: 14, lane: 1, at: 16, every: .4 }] },
+  { name: 'Every Horn in the North', groups: [
+    { type: 'hound', count: 22, lane: 'alt', at: 0, every: .3 },
+    { type: 'brute', count: 10, lane: 'alt', at: 6, every: 1.4 },
+    { type: 'ram', count: 5, lane: 'alt', at: 12, every: 2.6 },
+    { type: 'manatarms', count: 14, lane: 'alt', at: 16, every: .6 }] },
+  { name: 'The Winter King', boss: true, groups: [
+    { type: 'manatarms', count: 14, lane: 'alt', at: 0, every: .7 },
+    { type: 'brute', count: 8, lane: 'alt', at: 5, every: 1.6 },
+    { type: 'ram', count: 5, lane: 'alt', at: 10, every: 2.2 },
+    { type: 'warlord', count: 1, lane: 1, at: 16, every: 1, hp: 1.1 },
+    { type: 'warlord', count: 1, lane: 0, at: 22, every: 1, hp: .8 },
+    { type: 'hound', count: 18, lane: 'alt', at: 20, every: .35 }] },
+];
+export const WAVES = LEVEL === 'frostmere' ? FROST_WAVES : CASTLE_WAVES;
+// Frostmere's lanes are long, so its hosts are hardier to keep it the harder siege.
+const LEVEL_HP = LEVEL === 'frostmere' ? 1.35 : 1;
+
 // Wave-wide hp multiplier (1-based wave number).
 export const hpScale = n => 1 + .1 * (n - 1) + .006 * (n - 1) ** 2;
 // Gold for clearing wave n, and per second left on the countdown when calling early.
@@ -71,7 +136,7 @@ export const BUILD_COUNTDOWN = 25;
 export function schedule(n) {
   const out = [];
   for (const g of WAVES[n - 1].groups) for (let i = 0; i < g.count; i++)
-    out.push({ t: g.at + i * g.every, type: g.type, lane: g.lane === 'alt' ? i % 2 : g.lane, hp: hpScale(n) * (g.hp || 1) });
+    out.push({ t: g.at + i * g.every, type: g.type, lane: g.lane === 'alt' ? i % 2 : g.lane, hp: hpScale(n) * LEVEL_HP * (g.hp || 1) });
   return out.sort((a, b) => a.t - b.t);
 }
 

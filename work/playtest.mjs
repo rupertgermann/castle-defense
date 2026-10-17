@@ -1,14 +1,14 @@
 // Full playthrough through real input: click pads, hotkeys, horn; a simple bot spends gold between waves.
-// Usage (project root): node work/playtest.mjs [html-name] [speed]
+// Usage (project root): node work/playtest.mjs [html-name] [speed] [level]
 import { chromium } from '/Users/rupertgermann/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
 import { pathToFileURL } from 'node:url';
-const name = process.argv[2] || 'castle-defense', speed = Number(process.argv[3] || 3);
+const name = process.argv[2] || 'castle-defense', speed = Number(process.argv[3] || 3), level = process.argv[4];
 const browser = await chromium.launch({ headless: true, args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] });
 const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
 const errors = [];
 page.on('pageerror', e => errors.push('pageerror: ' + e.message));
 page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
-await page.goto(pathToFileURL(`${process.cwd()}/outputs/${name}.html`).href);
+await page.goto(pathToFileURL(`${process.cwd()}/outputs/${name}.html`).href + (level ? `?level=${level}` : ''));
 await page.waitForFunction(() => window.__sceneReady === true, null, { timeout: 120000 });
 await page.waitForTimeout(1500);
 await page.screenshot({ path: 'work/shots/play/0-title.png' });

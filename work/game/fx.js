@@ -1,7 +1,7 @@
 // FX: particles, decals, debris, coins, floating text, screen shake, castle damage, ambient life. Event-driven only.
 // Particles and decals render in their own pass inserted after GTAO (so AO never darkens them and bloom still sees hot cores);
 // they depth-test and soft-fade against GTAO's scene depth texture in the shader.
-import { THREE, scene, camera, controls, renderer, composer, height, bridgeDeck, BASE } from '../scene.js';
+import { THREE, scene, camera, controls, renderer, composer, height, bridgeDeck, BASE, world } from '../scene.js';
 import { Pass } from 'three/addons/postprocessing/Pass.js';
 import { state, bus, lanes, gatePoint } from './core.js';
 import * as enemiesMod from './enemies.js';
@@ -71,6 +71,7 @@ const PR = {
   plume: P({ life: [6, 9], size: [1.2, 1.7], grow: [3.6, 4.8], speed: [.3, .8], spread: 1, up: [2.8, 4], off: .8, c0: col('#2e2925'), c1: col('#9a948b'), cvar: .15, alpha: .36, fin: .05, fout: 1.2, frame: SM3, drag: .7, wind: 1.6, grav: -.15, lit: 1, spin: [-.25, .25] }),
   // ambient
   chimney: P({ life: [7, 10], size: [.35, .5], grow: [7, 10], speed: [.05, .2], spread: 1, up: [1.5, 2.1], off: .15, c0: col('#aaa69e'), c1: col('#d4d2cb'), cvar: .06, alpha: .2, fin: .22, fout: 1.3, frame: SM3, drag: .35, wind: 1, lit: 1, spin: [-.2, .2], amb: 1 }),
+  snow: P({ life: [7, 11], size: [.09, .16], speed: [.05, .3], spread: 0, c0: col('#f4f8ff', 1.6), alpha: .85, fin: .15, fout: .6, add: .6, frame: [FR.EMBER, 1], grav: .35, drag: .5, wind: .9, amb: 1 }),
   pollen: P({ life: [6, 10], size: [.1, .17], speed: [.05, .25], spread: 0, c0: col('#fff2c8', 2.4), alpha: .7, fin: .3, fout: 1, add: 1, frame: [FR.EMBER, 1], drag: .4, wind: .25, amb: 1 }),
   crow: P({ life: [5, 7], size: [1.9, 2.4], c0: col('#1a1816'), cvar: .1, alpha: .95, fin: .04, fout: .35, frame: [FR.BIRD, 1], anim: 1, drag: .15, grav: -.5 }),
   // fireworks
@@ -322,10 +323,7 @@ function updateTexts(realDt) {
 
 // ───────────────────────────── castle damage ─────────────────────────────
 // Fires near the gate. `stage` = minimum damage stage at which each one burns (1: <60% lives, 2: <30%, 3: lost).
-const FIRES = [
-  [-14.5, 27.6, 29.8, 1], [-9, 24.6, 28.2, 1], [-3.5, 27.6, 32.6, 2], [-18.5, 24.4, 25.6, 2], [.8, 24.4, 30.4, 2], [-13, 27.8, 17, 2],
-  [-22, 27.2, 24.2, 3], [22, 27, 25, 3], [-10, 38.5, -6, 3], [12, 30.5, -10, 3], [4, 27, 31.2, 3],
-];
+const FIRES = world.fx.fires;
 let forcedStage = null, damage = 0;
 const castleFires = [];
 function stageNow() {
@@ -503,20 +501,16 @@ function fireworks(n = 16, spread = 5) {
   }, k / n * spread * 1000 + R() * 250);
 }
 function heavySmoke() {
-  for (const [x, y, z] of [[-10, 38, -6], [-9, 25, 28], [12, 28, -10], [-20, 27, 5], [18, 24, 12]]) emitter(PR.plume, x, y, z, 9, 30, 1.6);
+  for (const [x, y, z] of world.fx.smoke) emitter(PR.plume, x, y, z, 9, 30, 1.6);
 }
 
 // ───────────────────────────── ambient ─────────────────────────────
 function ambientSetup() {
-  const chimneys = [];
-  for (const [x, z, w, d, h, r] of [[-19, 65, 7, 10, 4.4, .3], [-31, 78, 6, 8, 3.6, -.5], [26, 79, 7.5, 11, 4.2, -.2], [32, 98, 6, 8, 3.5, .4], [-8, 98, 5.5, 8, 3.6, .12], [125, 48, 6, 9, 3.8, 1.4]]) {
-    const lx = -w * .23, lz = -d * .2, c = Math.cos(r), s = Math.sin(r);
-    chimneys.push([x + lx * c + lz * s, height(x, z) - .25 + h + 3.55, z - lx * s + lz * c, 1.6 + R()]);
-  }
-  chimneys.push([13.9, BASE + 10.8 + 7.9, -15.25, 1.2], [13.9, BASE + 10.8 + 7.9, -4.75, .8], [-10.5, BASE + 7.5 + 7.9, 15.1, 1], [-7.6, BASE + 29.4, -9.5, .9]);
+  const chimneys = world.fx.chimneys;
   for (const [x, y, z, rate] of chimneys) persistent.push(E(PR.chimney, x, y, z, rate, 0, 1, { jitter: .2 }));
   // Pollen follows the camera target so the air near the action always has a little life.
-  persistent.push(E(PR.pollen, 0, 0, 0, 22, 0, 1, { pollen: true }));
+  const snowing = world.fx.ambient === 'snow';
+  persistent.push(E(snowing ? PR.snow : PR.pollen, 0, 0, 0, snowing ? 70 : 22, 0, 1, { pollen: true, high: snowing ? 22 : 10 }));
   // Pre-warm so chimneys are already smoking on the first frame.
   for (let k = 0; k < 90; k++) { for (const e of persistent) if (!e.pollen) runEmitter(e, .1); updateParticles(.1, .1); }
 }
@@ -526,7 +520,7 @@ function pollenStep(e, realDt) {
   while (e.acc >= 1) {
     e.acc--;
     const x = t.x + (R() - .5) * spread * 2, z = t.z + (R() - .5) * spread * 2;
-    burst(e.pr, x, groundAt(x, z) + 1 + R() * 10, z, 1, 1);
+    burst(e.pr, x, groundAt(x, z) + 1 + R() * e.high, z, 1, 1);
   }
 }
 

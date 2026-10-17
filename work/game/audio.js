@@ -1,7 +1,7 @@
 // Audio: fully procedural WebAudio. SFX are pre-rendered from recipes (audio-synth.js) and replayed with voice limiting,
 // density ducking, pitch/gain jitter and camera-relative panning. Music and ambience are generated live by a look-ahead scheduler.
 import { state, bus } from './core.js';
-import { THREE, camera, controls } from '../scene.js';
+import { THREE, camera, controls, world } from '../scene.js';
 import * as enemyModule from './enemies.js';
 import { SR, SOUNDS, renderSound, pluck, noiseBuffer, impulse } from './audio-synth.js';
 
@@ -85,7 +85,7 @@ function createEngine(c) {
   }
 
   const music = createMusic(c, buses.music, play);
-  const amb = createAmbience(c, buses.amb, play);
+  const amb = createAmbience(c, buses.amb, play, world.fx.ambient === 'snow');
   function setPaused(p) {
     const t = c.currentTime;
     for (const [param, v] of [[buses.sfxPause.gain, p ? 0 : 1], [sfxRev.gain, p ? 0 : 1], [musicLP.frequency, p ? 700 : 18000], [buses.music.gain, vol.music * (p ? .6 : 1)]]) param.setTargetAtTime(v, t, .08);
@@ -201,8 +201,8 @@ function createMusic(c, dest, play) {
   };
 }
 
-// ---------- ambience: wind, river, birds ----------
-function createAmbience(c, bus, play) {
+// ---------- ambience: wind, river, birds (winter: no river, harder wind, few birds) ----------
+function createAmbience(c, bus, play, winter = false) {
   const dest = c.createGain(); dest.gain.value = .13; dest.connect(bus);   // ambience sits well under everything
   const src = kind => { const s = c.createBufferSource(); s.buffer = noiseBuffer(kind); s.loop = true; s.start(0, Math.random() * 2); return s; };
   const node = (type, f, Q) => { const b = c.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = Q; return b; };
@@ -211,7 +211,7 @@ function createAmbience(c, bus, play) {
   const whistleBP = node('bandpass', 900, 14), whistleG = c.createGain(); whistleG.gain.value = 0;
   src('white').connect(whistleBP).connect(whistleG).connect(dest);
   // River: brown-noise body plus babble whose amplitude follows a very slowly played noise buffer.
-  const riverG = c.createGain(); riverG.gain.value = .5; riverG.connect(dest);
+  const riverG = c.createGain(); riverG.gain.value = winter ? 0 : .5; riverG.connect(dest);
   src('brown').connect(node('lowpass', 500, .5)).connect(riverG);
   const babble = c.createGain(); babble.gain.value = .06;
   const mod = src('brown'); mod.playbackRate.value = .004; const modG = c.createGain(); modG.gain.value = .12; mod.connect(modG).connect(babble.gain);
@@ -223,9 +223,9 @@ function createAmbience(c, bus, play) {
       if (nextWind < now) nextWind = now; if (nextBird < now) nextBird = now + 2;
       while (nextWind < until) { // gusts: slow random ramps of level, colour and whistle
         const seg = 2.5 + Math.random() * 3, t = nextWind + seg;
-        windG.gain.linearRampToValueAtTime(.15 + Math.random() * .4, t);
+        windG.gain.linearRampToValueAtTime((.15 + Math.random() * .4) * (winter ? 1.7 : 1), t);
         windBP.frequency.linearRampToValueAtTime(300 + Math.random() * 600, t);
-        whistleG.gain.linearRampToValueAtTime(Math.random() < .3 ? Math.random() * .03 : 0, t);
+        whistleG.gain.linearRampToValueAtTime(Math.random() < (winter ? .6 : .3) ? Math.random() * (winter ? .05 : .03) : 0, t);
         whistleBP.frequency.linearRampToValueAtTime(700 + Math.random() * 700, t);
         nextWind = t;
       }
@@ -233,7 +233,7 @@ function createAmbience(c, bus, play) {
         const pan = (Math.random() * 2 - 1) * .8;
         play('bird', { when: nextBird, pan, gain: .5 + Math.random() * .5 });
         if (Math.random() < .35) play('bird', { when: nextBird + .6 + Math.random(), pan: -pan, gain: .4 + Math.random() * .4 }); // a reply
-        nextBird += 3 + Math.random() * 10;
+        nextBird += winter ? 12 + Math.random() * 20 : 3 + Math.random() * 10;
       }
     },
   };

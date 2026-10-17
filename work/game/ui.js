@@ -1,5 +1,6 @@
 // HUD, title/end screens, input + selection, build/upgrade menus, wave flow, camera framing.
-import { THREE, camera, controls, renderer } from '../scene.js';
+import { THREE, camera, controls, renderer, titleView, fortPoints, laneNames } from '../scene.js';
+import { LEVEL, LEVELS, levelInfo, switchLevel } from '../level.js';
 import { state, bus, lanes, gatePoint } from './core.js';
 import * as towers from './towers.js';
 import * as enemies from './enemies.js';
@@ -69,10 +70,12 @@ root.innerHTML = `<style>${CSS}</style>${SPRITE}
 <div data-r="cards"></div>
 <div class="paused leather">Paused<small>Press P or ▶ to resume</small></div>
 <div class="screen title on" data-r="title">
-  <div class="crest">A Siege at First Light</div>
-  <h1 class="gtitle">Dawnhold</h1>
-  <div class="gsub">Fifteen warbands march on the river keep. Hold the gate until the last banner falls.</div>
+  <div class="crest">${levelInfo.crest}</div>
+  <h1 class="gtitle">${levelInfo.name}</h1>
+  <div class="gsub">${levelInfo.tagline}</div>
   ${fl}
+  <div class="maps" role="radiogroup" aria-label="Battlefield">${Object.entries(LEVELS).map(([k, l]) => `
+    <button class="mapbtn leather ${k === LEVEL ? 'sel' : ''}" data-a="level" data-k="${k}" role="radio" aria-checked="${k === LEVEL}">${icon(k === 'castle' ? 'tower' : 'peak')}<span><b>${l.name}</b><small>${l.place}</small></span></button>`).join('')}</div>
   <div class="diff" role="radiogroup" aria-label="Difficulty">${Object.entries(DIFFS).map(([k, d]) => `
     <button class="dcard leather" data-a="diff" data-k="${k}" role="radio">${icon(d.icon)}<h3>${d.name}</h3><p>${d.desc}</p>
     <div class="m"><span>${icon('heart')}${d.lives}</span><span>${icon('coin')}${Math.round(BASE_GOLD * d.gold)}</span><span>${icon('skull')}${Math.round(d.hp * 100)}%</span></div></button>`).join('')}</div>
@@ -107,7 +110,7 @@ function startGame(k = diffKey, instant = false) {
   controls.autoRotate = false;
   offFade = instant || reduced ? 1e-9 : 1;
   flyTo('overview', instant);
-  banner('Dawnhold', 'Prepare the Defences', 'Raise towers beside the roads, then sound the horn');
+  banner(levelInfo.name, 'Prepare the Defences', 'Raise towers beside the roads, then sound the horn');
 }
 
 function callWave() {
@@ -141,7 +144,12 @@ function endGame(won) {
 function restart() { sessionStorage.setItem('cd-restart', diffKey); location.reload(); }
 
 // ── Camera ──
-const BOUNDS = { x0: -50, x1: 155, z0: -50, z1: 165 };
+// Pan limits: the lanes plus the fortress, with some margin.
+const BOUNDS = (() => { const b = { x0: Infinity, x1: -Infinity, z0: Infinity, z1: -Infinity }, v = new THREE.Vector3();
+  const add = (x, z) => { b.x0 = Math.min(b.x0, x - 15); b.x1 = Math.max(b.x1, x + 15); b.z0 = Math.min(b.z0, z - 15); b.z1 = Math.max(b.z1, z + 15); };
+  for (const lane of lanes) for (let d = 0; d <= lane.length; d += 5) { lane.pointAt(d, v); add(v.x, v.z); }
+  for (const [x, , z] of fortPoints) add(x, z);
+  return b; })();
 const views = {};
 // Portrait screens try a few azimuths and keep the tightest fit; landscape keeps the classic south view.
 function fitOverview() {
@@ -152,8 +160,7 @@ function fitOverview() {
 function fitAt(az) {
   const pts = [];
   for (const lane of lanes) for (let d = 0; d <= lane.length; d += 6) pts.push(lane.pointAt(d));
-  for (const x of [-36, 36]) for (const z of [-36, 34]) pts.push(new THREE.Vector3(x, 14, z));
-  for (const x of [-30, 30]) for (const z of [-30, 30]) pts.push(new THREE.Vector3(x, 46, z));
+  for (const p of fortPoints) pts.push(new THREE.Vector3(...p));
   const box = new THREE.Box3().setFromPoints(pts), target = box.getCenter(new THREE.Vector3()).setY(6);
   const cam = camera.clone(); cam.clearViewOffset();
   const dir = new THREE.Vector3(Math.sin(az), 0, Math.cos(az)).multiplyScalar(Math.cos(.86)).setY(Math.sin(.86));
@@ -183,9 +190,7 @@ function getView(name) {
   if (name === 'overview') return views.overview = fitOverview();
   return {
     gate: presetView(gatePoint.x, gatePoint.y - 4, gatePoint.z + 8, 26, 44, 62),
-    bridge: presetView(80, 8, 54, 12, 52, 74),
-    south: presetView(10, 6, 108, -30, 58, 70),
-    title: presetView(4, 14, 4, -120, 62, 138),
+    title: presetView(...titleView),
   }[name];
 }
 let tween = null;
@@ -220,7 +225,7 @@ function setupCamera() {
   titleOffset(); addEventListener('resize', () => { if (state.phase === 'title') titleOffset(); });
   const el = renderer.domElement;
   el.setAttribute('role', 'application');
-  el.setAttribute('aria-label', 'Dawnhold, a castle tower-defense game. Click stone build sites to raise towers and click towers to upgrade or sell them. Drag to rotate, right-drag or two fingers to pan, scroll or pinch to zoom, double-click to reframe. Space sounds the next wave, P pauses, F changes speed.');
+  el.setAttribute('aria-label', `${levelInfo.name}, a castle tower-defense game. Click stone build sites to raise towers and click towers to upgrade or sell them. Drag to rotate, right-drag or two fingers to pan, scroll or pinch to zoom, double-click to reframe. Space sounds the next wave, P pauses, F changes speed.`);
   // Replace the scene's double-click reset with the game overview (capture phase runs before the canvas listener).
   addEventListener('dblclick', e => { if (e.target !== el) return; e.stopPropagation(); if (state.phase !== 'title') flyTo('overview'); }, true);
 }
@@ -375,7 +380,7 @@ function refreshHud(realDt) {
     hudKey = key;
     set($.pvk, w ? (fighting ? `Wave ${n} · Battle` : `Next · Wave ${n}`) : 'All waves repelled');
     set($.pvname, w ? w.name : 'The keep stands'); $.pvname.classList.toggle('boss', !!w?.boss);
-    $.pvlist.innerHTML = w ? composition(n).map(c => `<span class="en ${isBoss(c.type) ? 'boss' : ''}" title="${enemyName(c.type)} — ${[...c.lanes].map(l => l ? 'east bridge' : 'south road').join(' & ')}">${icon(enemyIcon(c.type))}<b>${c.count}</b>${[...c.lanes].sort().map(l => `<i class="l${l}">${l ? 'E' : 'S'}</i>`).join('')}</span>`).join('') : '';
+    $.pvlist.innerHTML = w ? composition(n).map(c => `<span class="en ${isBoss(c.type) ? 'boss' : ''}" title="${enemyName(c.type)} — ${[...c.lanes].map(l => laneNames[l]).join(' & ')}">${icon(enemyIcon(c.type))}<b>${c.count}</b>${[...c.lanes].sort().map(l => `<i class="l${l}">${l ? 'E' : 'S'}</i>`).join('')}</span>`).join('') : '';
     $.pvbar.hidden = !fighting;
   }
   if (fighting) {
@@ -420,7 +425,7 @@ function showEnd(won) {
   root.classList.add('ended'); controls.autoRotate = !reduced;
   $.end.innerHTML = `<div class="end-card parch"><div class="end-top"><div class="medal">${icon(won ? 'crown' : 'skull')}</div></div>
     <h2>${won ? 'Victory' : 'The Keep Has Fallen'}</h2>${fl}
-    <p class="lead">${won ? 'The last banner lies in the mud. Dawnhold stands, and the river runs quiet once more.' : `The gate gave way during wave ${state.wave}. Bards will sing of how long the walls held.`}</p>
+    <p class="lead">${won ? levelInfo.won : `The gate gave way during wave ${state.wave}. Bards will sing of how long the walls held.`}</p>
     <div class="ledger">${cells.map(([ic, v, l]) => `<div>${icon(ic)}<b data-to="${v}">0</b><span>${l}</span></div>`).join('')}</div>
     <button class="cta" data-a="again">${won ? 'Play Again' : 'Rise Again'}</button>
     <div class="how" style="color:var(--ink2);text-shadow:none;margin-top:12px;font-size:13px">${DIFFS[diffKey].name} difficulty</div></div>`;
@@ -440,6 +445,7 @@ function toggle(action) {
 }
 function act(a, el, e) {
   if (a === 'diff') return selectDiff(el.dataset.k), bus.emit('ui:click');
+  if (a === 'level') return bus.emit('ui:click'), switchLevel(el.dataset.k);
   if (a === 'begin') return bus.emit('ui:click'), startGame();
   if (a === 'again') return bus.emit('ui:click'), restart();
   if (a === 'horn') return bus.emit('ui:click'), callWave();

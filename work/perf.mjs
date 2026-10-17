@@ -1,11 +1,11 @@
-// GPU cost of one frame mid-battle at Retina scale. Usage (project root): node work/perf.mjs [html-name]
+// GPU cost of one frame mid-battle at Retina scale. Usage (project root): node work/perf.mjs [html-name] [level]
 // Renders the composer back-to-back with a readPixels fence; prints median ms, draw calls and triangles per frame.
 import { chromium } from '/Users/rupertgermann/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
 import { pathToFileURL } from 'node:url';
-const name = process.argv[2] || 'castle-defense';
+const name = process.argv[2] || 'castle-defense', level = process.argv[3];
 const browser = await chromium.launch({ headless: true, args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] });
 const page = await browser.newPage({ viewport: { width: 1728, height: 1000 }, deviceScaleFactor: 2 });
-await page.goto(pathToFileURL(`${process.cwd()}/outputs/${name}.html`).href);
+await page.goto(pathToFileURL(`${process.cwd()}/outputs/${name}.html`).href + (level ? `?level=${level}` : ''));
 await page.waitForFunction(() => window.__sceneReady === true, null, { timeout: 120000 });
 await page.keyboard.press('Enter'); await page.waitForTimeout(1500);
 await page.keyboard.press('Space'); await page.waitForTimeout(8000); // horn: enemies on the field

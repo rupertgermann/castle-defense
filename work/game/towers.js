@@ -1,5 +1,5 @@
 // Towers: build pads, five tower types with three levels, targeting, projectiles and damage.
-import { THREE, scene, camera, renderer, composer, height, clearTrees, bridgeDeck } from '../scene.js';
+import { THREE, scene, camera, renderer, composer, height, clearTrees, bridgeDeck, padSpots } from '../scene.js';
 import { state, bus, lanes } from './core.js';
 import { damageEnemy, enemiesInRadius, ENEMY_TYPES } from './enemies.js';
 import { instantiate, ghost, scaffold, padGeometry, runeTexture, projectileGeometries, poseArcher, poseBallista, glowTexture, renderArchers, liveArchers, MANGONEL } from './towers-models.js';
@@ -54,15 +54,7 @@ export const TOWER_TYPES = {
   },
 };
 
-// Tactical spots along both lanes (validated: off the road, out of the river, clear of cottages).
-const PAD_SPOTS = [
-  [22, 132], [3, 118], [24, 106], [3, 88], [21, 64], [-3, 71],          // village road, south lane
-  [12, 44], [-15, 52], [-21, 38],                                        // fork and gate approach
-  [28, 36], [-25, 48],                                                    // castle hill
-  [36, 44], [37, 65],                                                     // gate road, east
-  [50, 42], [50, 63], [111, 41], [109, 65],                               // both bridgeheads
-  [139, 62],                                                              // east road bend
-];
+const PAD_SPOTS = padSpots;
 export const pads = [];
 
 const groundY = (x, z) => {

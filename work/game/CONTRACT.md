@@ -1,6 +1,6 @@
 # Castle Defense — module contract
 
-A tower-defense game built on the existing castle scene (`work/scene.js`). **The castle, terrain, river, bridge, village, trees and lighting must keep their current look.** Game content is added on top and must match that look: same warm morning light, same stone materials (`materials.stone/trim/base` from scene.js), grounded, detailed, believable medieval — not toy-like, not neon.
+A tower-defense game with two levels (see Levels and worlds). **The castle, terrain, river, bridge, village, trees and lighting of Dawnhold must keep their current look.** Game content is added on top and must match that look: same warm morning light, same stone materials (`materials.stone/trim/base` from scene.js), grounded, detailed, believable medieval — not toy-like, not neon.
 
 Quality bar: AAA. A harsh visual critic will review screenshots of your work and send it back until it is genuinely impressive.
 
@@ -19,9 +19,13 @@ Quality bar: AAA. A harsh visual critic will review screenshots of your work and
 
 You may add helper files named `work/game/<yourmodule>-*.js`. Never edit another owner's file; if you need something from another module, code against this contract (it may still be a stub while you work) and mention the need in your report.
 
+## Levels and worlds
+
+`work/level.js` picks the level for this page load (`?level=` or `sessionStorage['cd-level']`, default `castle`); switching reloads the page. `scene.js` is the engine (renderer, post-processing, materials, building helpers, render loop) and builds one world: `work/worlds/castle.js` (Dawnhold, the river keep) or `work/worlds/frostmere.js` (Frostmere, the winter pass). Shared fortress pieces live in `work/worlds/fort-kit.js`. A world returns `{ height, BASE, gateCenter, sun, terrain, water, treeLocations, bridgeDeck, lanePaths, laneNames, padSpots, view, titleView, fortPoints, mist, fx: { chimneys, fires, smoke, ambient }, moving, animate(time) }`. Game modules must read world facts from these exports, never hard-code coordinates.
+
 ## scene.js exports
 
-`THREE, scene, camera, controls, renderer, composer, sun, terrain, water, materials, stoneMaps, height(x,z), roadX(z), riverX(z), riverWidth(z), noise, fbm, BASE (=14, castle courtyard y), gateCenter, treeLocations, clearTrees(x,z,r), frameHooks, box, cylinder, beam, tiledCone, pitchedRoof, facade, mesh, worldUV, unitBox, initialPosition, pathPoints, bridgeDeck`.
+`THREE, scene, camera, controls, renderer, composer, sun, terrain, water (null on Frostmere), materials, stoneMaps, height(x,z), noise, fbm, BASE (fortress courtyard y), gateCenter, treeLocations, clearTrees(x,z,r), frameHooks, box, cylinder, beam, tiledCone, pitchedRoof, facade, mesh, worldUV, unitBox, initialPosition, bridgeDeck (never matches on Frostmere), lanePaths, laneNames, padSpots, titleView, fortPoints, world`.
 
 - `renderer.shadowMap.autoUpdate` is **false** after the first frame (static shadow map; the scene is huge). Set `renderer.shadowMap.needsUpdate = true` after placing static things (e.g. a tower). Moving things should use cheap blob/contact shadows, not the shadow map.
 - `controls.update()` runs **after** frame hooks each frame. Never permanently offset the camera for shake; use `camera.setViewOffset` or similar and restore.

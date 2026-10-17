@@ -1,5 +1,5 @@
 // Shared game state, event bus, and enemy lanes. Every game module imports from here; nothing here imports game modules.
-import { THREE, roadX, height, pathPoints, bridgeDeck, gateCenter } from '../scene.js';
+import { THREE, height, bridgeDeck, gateCenter, lanePaths, laneNames } from '../scene.js';
 
 export const state = {
   phase: 'title',      // 'title' | 'build' | 'wave' | 'won' | 'lost'
@@ -22,12 +22,7 @@ export const bus = {
   emit(name, data) { for (const fn of listeners.get(name) || []) fn(data); },
 };
 
-// Lanes: dense polylines following the existing dirt road ribbons, from spawn to the castle gate.
-function sampleCurve(points, t0, t1, out) {
-  const curve = new THREE.CatmullRomCurve3(points.map(p => new THREE.Vector3(p[0], 0, p[1])));
-  const n = Math.ceil(Math.abs(t1 - t0) * 400);
-  for (let i = 0; i <= n; i++) out.push(curve.getPoint(t0 + (t1 - t0) * i / n));
-}
+// Lanes: dense polylines from the world (spawn → gate), resampled with walk heights.
 function walkHeight(x, z) {
   const b = bridgeDeck;
   if (x > b.x0 - 1 && x < b.x1 + 1 && Math.abs(z - b.z) < b.halfWidth + 1) return Math.max(height(x, z) + .1, b.y);
@@ -66,14 +61,7 @@ function makeLane(name, raw) {
 }
 const clampD = (d, length) => Math.max(0, Math.min(length, d));
 
-const south = [], east = [];
-// South lane: the village road (painted into the terrain along roadX), joining the gate road at the fork.
-for (let z = 150; z >= 56; z -= .5) south.push(new THREE.Vector3(roadX(z), 0, z)); // spawn (≈12, 150) → fork
-sampleCurve(pathPoints.gateRoad, .4, 0, south);            // fork (1, 54) → gate (-9, 28)
-// East lane: road from the east hills, across the stone bridge, up to the gate.
-sampleCurve(pathPoints.eastRoad, .55, 0, east);            // spawn around (145, 90) → bridge east end (99, 51)
-sampleCurve(pathPoints.gateRoad, 1, 0, east);              // bridge west end (64, 52) → gate (-9, 28)
-export const lanes = [makeLane('south', south), makeLane('east', east)];
+export const lanes = lanePaths.map((points, i) => makeLane(laneNames[i], points));
 
 // Enemies that reach this point have breached the gate.
 export const gatePoint = new THREE.Vector3(gateCenter.x, gateCenter.y, gateCenter.z);
