@@ -270,6 +270,9 @@ position:fixed;inset:0;pointer-events:none;font-family:var(--serif);color:var(--
 #cd .pin::after{content:"";position:absolute;left:50%;bottom:-6px;margin-left:-6px;border:6px solid transparent;border-bottom:0;border-top-color:#23170d}
 #cd .pin[hidden]{display:none}
 
+/* Mid widths (small laptops, landscape tablets): the herald drops to its own centred row instead of colliding. */
+@media (min-width:761px) and (max-width:1100px){#cd .top{flex-wrap:wrap;row-gap:8px}#cd .herald{order:3;flex-basis:100%;justify-content:center}}
+
 /* ── Compact / portrait ── */
 @media (max-width:760px){
  #cd{font-size:14px}
@@ -313,6 +316,8 @@ position:fixed;inset:0;pointer-events:none;font-family:var(--serif);color:var(--
  #cd .ledger{margin:14px 16px 16px}
 }
 @keyframes cdSheet{0%{transform:translateY(40px);opacity:0}}
+/* Landscape phones: the card docks to the right edge so the radial menu keeps the rest of the screen. */
+@media (max-width:760px) and (orientation:landscape){#cd .card{left:auto!important;right:8px;top:8px!important;bottom:auto;max-height:calc(100% - 16px);width:270px;overflow:auto}#cd .card .desc{display:none}}
 @media (hover:none){#cd .kbd,#cd .how .desk{display:none!important}}
 @media (prefers-reduced-motion:reduce){#cd *,#cd *::before,#cd *::after{animation:none!important;transition:none!important}#cd .banner.show{opacity:1}}
 `;

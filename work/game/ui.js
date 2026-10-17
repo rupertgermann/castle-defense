@@ -355,8 +355,9 @@ function placeAnchored() {
   let sx = (proj.x + 1) / 2 * W, sy = (1 - proj.y) / 2 * H;
   const bmOn = $.bm.classList.contains('open');
   if (bmOn) {
-    const topLimit = $.top.offsetTop + $.top.offsetHeight + 90, botLimit = H - (compact && cardEl ? cardEl.offsetHeight + 130 : 90);
-    const bx = THREE.MathUtils.clamp(sx, 90, W - 90), by = THREE.MathUtils.clamp(sy, topLimit, Math.max(topLimit, botLimit));
+    const docked = compact && W > H && cardEl;   // landscape phone: card docked right, see ui-style
+    const topLimit = $.top.offsetTop + $.top.offsetHeight + 90, botLimit = H - (compact && cardEl && !docked ? cardEl.offsetHeight + 130 : 90);
+    const bx = THREE.MathUtils.clamp(sx, 90, W - (docked ? cardEl.offsetWidth + 110 : 90)), by = THREE.MathUtils.clamp(sy, topLimit, Math.max(topLimit, botLimit));
     $.bm.style.transform = `translate(${bx}px,${by}px)`; $.bm.style.visibility = visible ? '' : 'hidden';
     sx = bx; sy = by;
   }
