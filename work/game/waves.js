@@ -21,8 +21,7 @@ const CASTLE_WAVES = [
   { name: 'The Brute Squad', groups: [
     { type: 'brute', count: 3, lane: 0, at: 0, every: 4 },
     { type: 'raider', count: 10, lane: 1, at: 2, every: .9 },
-    { type: 'hound', count: 6, lane: 0, at: 12, every: .6 },
-    { type: 'outrider', count: 3, lane: 1, at: 16, every: 1.4 }] },
+    { type: 'outrider', count: 2, lane: 1, at: 14, every: 1.6 }] },
   { name: 'Rams at the Gate', groups: [
     { type: 'ram', count: 2, lane: 1, at: 0, every: 8 },
     { type: 'manatarms', count: 8, lane: 'alt', at: 3, every: 1.4 },
@@ -35,7 +34,7 @@ const CASTLE_WAVES = [
     { type: 'warlord', count: 1, lane: 0, at: 9, every: 1, hp: .55 },
     { type: 'raider', count: 12, lane: 1, at: 2, every: .8 }] },
   { name: 'Shieldwall', groups: [
-    { type: 'manatarms', count: 14, lane: 'alt', at: 0, every: .9 },
+    { type: 'manatarms', count: 11, lane: 'alt', at: 0, every: .9 },
     { type: 'shaman', count: 2, lane: 'alt', at: 5, every: 4 },
     { type: 'brute', count: 4, lane: 'alt', at: 8, every: 2.5 }] },
   { name: 'Battering Storm', groups: [
@@ -46,7 +45,7 @@ const CASTLE_WAVES = [
     { type: 'brute', count: 6, lane: 1, at: 0, every: 2.2 },
     { type: 'shaman', count: 2, lane: 1, at: 4, every: 5 },
     { type: 'outrider', count: 5, lane: 0, at: 10, every: 1.2 },
-    { type: 'raider', count: 16, lane: 1, at: 3, every: .55 },
+    { type: 'raider', count: 8, lane: 1, at: 3, every: .55 },
     { type: 'hound', count: 10, lane: 0, at: 6, every: .5 }] },
   { name: 'The Long Column', groups: [
     { type: 'manatarms', count: 16, lane: 0, at: 0, every: .8 },
@@ -54,7 +53,7 @@ const CASTLE_WAVES = [
     { type: 'brute', count: 6, lane: 1, at: 4, every: 2 },
     { type: 'raider', count: 14, lane: 1, at: 16, every: .5 }] },
   { name: 'Every Banner Raised', groups: [
-    { type: 'hound', count: 20, lane: 'alt', at: 0, every: .35 },
+    { type: 'hound', count: 10, lane: 'alt', at: 0, every: .35 },
     { type: 'outrider', count: 8, lane: 'alt', at: 4, every: .9 },
     { type: 'shaman', count: 3, lane: 'alt', at: 9, every: 3 },
     { type: 'brute', count: 8, lane: 'alt', at: 6, every: 1.6 },
@@ -101,7 +100,7 @@ const FROST_WAVES = [
     { type: 'warlord', count: 1, lane: 1, at: 8, every: 1, hp: .6 },
     { type: 'hound', count: 12, lane: 0, at: 2, every: .5 }] },
   { name: 'Frozen Shieldwall', groups: [
-    { type: 'manatarms', count: 16, lane: 'alt', at: 0, every: .8 },
+    { type: 'manatarms', count: 13, lane: 'alt', at: 0, every: .8 },
     { type: 'shaman', count: 2, lane: 'alt', at: 4, every: 4 },
     { type: 'brute', count: 5, lane: 'alt', at: 8, every: 2.2 }] },
   { name: 'Avalanche', groups: [
@@ -111,14 +110,14 @@ const FROST_WAVES = [
     { type: 'ram', count: 5, lane: 1, at: 0, every: 3.5 },
     { type: 'outrider', count: 6, lane: 0, at: 6, every: 1.1 },
     { type: 'brute', count: 6, lane: 0, at: 3, every: 2 },
-    { type: 'manatarms', count: 10, lane: 'alt', at: 8, every: 1 }] },
+    { type: 'manatarms', count: 5, lane: 'alt', at: 8, every: 1 }] },
   { name: 'The Long Winter', groups: [
     { type: 'manatarms', count: 18, lane: 0, at: 0, every: .7 },
     { type: 'brute', count: 8, lane: 1, at: 4, every: 1.7 },
     { type: 'ram', count: 3, lane: 'alt', at: 12, every: 4 },
     { type: 'hound', count: 14, lane: 1, at: 16, every: .4 }] },
   { name: 'Every Horn in the North', groups: [
-    { type: 'hound', count: 22, lane: 'alt', at: 0, every: .3 },
+    { type: 'hound', count: 14, lane: 'alt', at: 0, every: .3 },
     { type: 'shaman', count: 3, lane: 'alt', at: 8, every: 3 },
     { type: 'brute', count: 10, lane: 'alt', at: 6, every: 1.4 },
     { type: 'ram', count: 5, lane: 'alt', at: 12, every: 2.6 },
@@ -142,26 +141,25 @@ const SALT_WAVES = [
   { name: 'Across the Causeway', groups: [
     { type: 'manatarms', count: 5, lane: 2, at: 0, every: 2 },
     { type: 'raider', count: 9, lane: 'alt', at: 3, every: 1 }] },
+  { name: 'Three Roads', groups: [
+    { type: 'hound', count: 12, lane: 'alt', at: 0, every: .6 },
+    { type: 'manatarms', count: 6, lane: 'alt', at: 6, every: 1.6 }] },
   { name: 'Riders on the Cliff Road', groups: [
-    { type: 'outrider', count: 5, lane: 1, at: 0, every: 1.5 },
-    { type: 'hound', count: 9, lane: 'alt', at: 4, every: .6 },
-    { type: 'manatarms', count: 6, lane: 'alt', at: 8, every: 1.6 }] },
+    { type: 'outrider', count: 3, lane: 1, at: 0, every: 2.2 },
+    { type: 'raider', count: 10, lane: 'alt', at: 3, every: .8 }] },
   { name: 'The Bone-Priests', groups: [
-    { type: 'brute', count: 4, lane: 2, at: 0, every: 3 },
+    { type: 'brute', count: 3, lane: 2, at: 0, every: 3 },
     { type: 'shaman', count: 2, lane: 2, at: 3, every: 4 },
     { type: 'raider', count: 12, lane: 'alt', at: 2, every: .8 }] },
   { name: 'Rams Up the Cliff', groups: [
     { type: 'ram', count: 2, lane: 1, at: 0, every: 7 },
     { type: 'hound', count: 10, lane: 0, at: 4, every: .5 },
     { type: 'manatarms', count: 8, lane: 2, at: 8, every: 1.2 }] },
-  { name: 'Spring Tide', groups: [
-    { type: 'raider', count: 24, lane: 'alt', at: 0, every: .45 },
-    { type: 'brute', count: 3, lane: 'alt', at: 8, every: 3 }] },
   { name: 'Iron on the Sand', groups: [
-    { type: 'manatarms', count: 15, lane: 0, at: 0, every: .8 },
-    { type: 'shaman', count: 2, lane: 0, at: 5, every: 5 },
-    { type: 'outrider', count: 6, lane: 1, at: 2, every: 1 },
-    { type: 'ram', count: 2, lane: 2, at: 6, every: 6 }] },
+    { type: 'manatarms', count: 10, lane: 0, at: 0, every: .9 },
+    { type: 'shaman', count: 1, lane: 0, at: 5, every: 1 },
+    { type: 'outrider', count: 3, lane: 1, at: 2, every: 1.4 },
+    { type: 'ram', count: 1, lane: 2, at: 6, every: 1 }] },
   { name: 'The Sea-King\'s Champion', boss: true, groups: [
     { type: 'manatarms', count: 9, lane: 'alt', at: 0, every: 1 },
     { type: 'warlord', count: 1, lane: 2, at: 8, every: 1, hp: .55 },

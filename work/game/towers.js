@@ -285,19 +285,42 @@ function showRange(center, range, color, minRange = 0) {
 const laneOf = e => typeof e.lane === 'number' ? lanes[e.lane] : e.lane;
 const remaining = e => { const l = laneOf(e); return (l ? l.length : 0) - (e.dist || 0); };
 const aimPoint = (e, out) => out.copy(e.pos).setY(e.pos.y + (e.height || 1.6) * .6);
-function inRange(tower, e) { const d = Math.hypot(e.pos.x - tower.pos.x, e.pos.z - tower.pos.z); return e.alive && d <= tower.range && d >= (stat(tower).minRange || 0); }
+// Lobbed shots (bombard, pitch, trebuchet) predict along the road itself, so curves and the gate don't throw them off.
+const ROAD_AIM = { cannonball: true, firepot: true, boulder: true };
+const RELEASE = { boulder: .3 };   // seconds between firing and the projectile leaving (the trebuchet's arm swing)
+function onRoad(e, T, out) {
+  const l = laneOf(e), t = ENEMY_TYPES[e.typeId];
+  if (!l || !t) { aimPoint(e, out); return e.velocity ? out.addScaledVector(e.velocity, T) : out; }
+  l.pointAt(Math.min(l.length, e.dist + t.speed * (e.slowFactor || 1) * T), out);
+  return out.setY(out.y + (e.height || 1.6) * .6);
+}
+function inRange(tower, e) {
+  const d = Math.hypot(e.pos.x - tower.pos.x, e.pos.z - tower.pos.z), s = stat(tower);
+  if (!e.alive || d > tower.range || d < (s.minRange || 0)) return false;
+  if (!s.minRange) return true;
+  // engines with a dead zone only commit to a target whose landing point is still outside it, and short of the gate
+  const kind = TOWER_TYPES[tower.typeId].projectile, T = FLIGHT[kind](d) + (RELEASE[kind] || 0), l = laneOf(e), t = ENEMY_TYPES[e.typeId];
+  if (l && t && e.dist + t.speed * T > l.length - 2) return false;
+  onRoad(e, T, tmp3); const dl = Math.hypot(tmp3.x - tower.pos.x, tmp3.z - tower.pos.z);
+  return dl >= s.minRange && dl <= tower.range + 2;
+}
 function acquire(tower) {
   let best = null, bestR = Infinity;
   for (const e of state.enemies) if (inRange(tower, e)) { const r = remaining(e); if (r < bestR) { bestR = r; best = e; } }
   return best;
 }
 // Predict where the target's aim point will be when a projectile of flight-time f(dist) arrives.
-function lead(from, e, flightTime, out) {
+function lead(from, e, kind, out) {
+  const flightTime = FLIGHT[kind], delay = RELEASE[kind] || 0;
   aimPoint(e, out);
   let T = flightTime(from.distanceTo(out));
-  for (let k = 0; k < 2; k++) { aimPoint(e, out); if (e.velocity) out.addScaledVector(e.velocity, T); T = flightTime(from.distanceTo(out)); }
+  for (let k = 0; k < 2; k++) {
+    if (ROAD_AIM[kind]) onRoad(e, T + delay, out); else { aimPoint(e, out); if (e.velocity) out.addScaledVector(e.velocity, T); }
+    T = flightTime(from.distanceTo(out));
+  }
   return T;
 }
+const tmp3 = new THREE.Vector3();
 const FLIGHT = {
   arrow: d => .22 + d / 42, cannonball: d => .5 + d / 26, bolt: d => .05 + d / 85, arcane: d => d / 20, firepot: d => .8 + d / 22, boulder: d => 1.5 + d / 24,
 };
@@ -317,7 +340,7 @@ function updateTower(tower, dt) {
   let aligned = true;
   if (e) {
     muzzleWorld(tower, fromTmp);
-    const T = lead(fromTmp, e, FLIGHT[type.projectile], aimTmp);
+    const T = lead(fromTmp, e, type.projectile, aimTmp);
     const want = Math.atan2(aimTmp.x - tower.pos.x, aimTmp.z - tower.pos.z);
     const d = angleDiff(_.yaw, want), step = TURN[tower.typeId] * dt;
     _.yaw += Math.max(-step, Math.min(step, d));
@@ -419,7 +442,7 @@ function makeProjectiles() {
 function fire(tower, target) {
   const _ = tower._, type = TOWER_TYPES[tower.typeId], s = stat(tower), kind = type.projectile;
   const from = muzzleWorld(tower, new THREE.Vector3());
-  const to = new THREE.Vector3(), T = lead(from, target, FLIGHT[kind], to);
+  const to = new THREE.Vector3(), T = lead(from, target, kind, to);
   const p = { kind, tower, target, from, to, T, t: 0, pos: from.clone(), prev: from.clone(), vel: new THREE.Vector3(), damage: s.damage, splash: s.splash || 0, slow: s.slow || null, armorPierce: s.armorPierce || 0, burn: s.burn || null, trail: [] };
   if (kind === 'cannonball' || kind === 'firepot' || kind === 'boulder') to.y -= (target.height || 1.6) * .6;
   if (kind === 'arcane') { p.vel.subVectors(to, from).normalize().multiplyScalar(9).y += 7; p.T = 3.5; p.wob = Math.random() * 6; }

@@ -89,7 +89,7 @@ export function buildSaltreach(K) {
   const cottages = [[-36, 96, 6.5, 9, 3.9, .7], [-48, 112, 6, 8, 3.6, .4], [-14, 120, 7, 10, 4.1, -.4], [30, 96, 6, 8.5, 3.6, -.2], [44, 120, 6.5, 9, 3.8, .3]];
   // ---- build pads: alternate sides along all three lanes, on firm, dry, level ground off the road ----
   const padSpots = [];
-  for (const [L, every, skip] of [[lanePaths[0], 26, 12], [lanePaths[1], 30, 22], [lanePaths[2], 28, 30]]) {
+  for (const [L, every, skip] of [[lanePaths[0], 26, 12], [lanePaths[1], 40, 22], [lanePaths[2], 28, 30]]) {
     for (let i = skip; i < L.length - 8; i += every) {
       const p = L[i], q = L[Math.min(L.length - 1, i + 3)], tx = q.x - p.x, tz = q.z - p.z, tl = Math.hypot(tx, tz) || 1;
       for (const side of (i / every) % 2 < 1 ? [1, -1] : [-1, 1]) {
@@ -105,6 +105,18 @@ export function buildSaltreach(K) {
       }
     }
   }
+  // Siege sites by the junction: far enough off the shared gate road that a trebuchet's dead zone doesn't swallow it.
+  const levelAt = (x, z) => { let lo = Infinity, hi = -Infinity; for (let k = 0; k < 9; k++) { const a = k * Math.PI / 4, rr = k ? 4.2 : 0, h = height(x + Math.cos(a) * rr, z + Math.sin(a) * rr); lo = Math.min(lo, h); hi = Math.max(hi, h); } return hi - lo < 3.2 && lo > SEA + 1.2; };
+  const laneD = (x, z) => lanePaths.map(L => { let b = Infinity; for (let i = 0; i < L.length; i += 4) b = Math.min(b, Math.hypot(L[i].x - x, L[i].z - z)); return b; });
+  const cands = [];
+  for (let x = -34; x <= 44; x += 3) for (let z = 34; z <= 110; z += 3) {
+    const d = laneD(x, z), near = Math.min(...d);
+    if (near < 12.5 || near > 20 || Math.hypot(x, z) < 40 || !levelAt(x, z) || cottages.some(([cx, cz]) => Math.hypot(cx - x, cz - z) < 11)) continue;
+    cands.push([x, z, d.reduce((a, b) => a + Math.min(b, 40), 0)]);   // lower = closer to all three roads
+  }
+  cands.sort((a, b) => a[2] - b[2]);
+  let added = 0;
+  for (const [x, z] of cands) { if (added >= 4) break; if (padSpots.some(([px, pz]) => Math.hypot(px - x, pz - z) < 13)) continue; padSpots.push([x, z]); added++; }
   const nearPad = (x, z, r) => padSpots.some(([px, pz]) => Math.hypot(px - x, pz - z) < r);
 
 
@@ -250,6 +262,7 @@ export function buildSaltreach(K) {
     if (y > SEA + 2.4) continue;
     const yaw = Math.atan2(q.x - p.x, q.z - p.z);
     instance(slabG, slabMat, p.x, y - .12, p.z, 6.4, .3, 1.45, yaw + between(-.03, .03), new THREE.Color().setHSL(.1, .1, between(.72, 1)));
+    for (const sd of [-1, 1]) instance(slabG, slabMat, p.x + Math.cos(yaw) * 3.35 * sd, y + .02, p.z - Math.sin(yaw) * 3.35 * sd, .45, .42, 1.4, yaw + between(-.05, .05), new THREE.Color().setHSL(.09, .08, between(.55, .75)));   // kerbs
     if (i % 9 === 0) for (const s of [-1, 1]) instance(pileG, pileMat, p.x + Math.cos(yaw) * 3.9 * s, SEA - 1.2, p.z - Math.sin(yaw) * 3.9 * s, 1, between(2.2, 3.2), 1, rand() * 6, null, between(-.08, .08), between(-.08, .08));
   }
 
@@ -327,6 +340,7 @@ export function buildSaltreach(K) {
   // rowing boats pulled up on the sand
   const rowMat = new THREE.MeshStandardMaterial({ color: '#8a6c4c', roughness: .9, side: THREE.DoubleSide });
   for (const [x, z, yaw] of [[-44, 132, .3], [-38, 140, .8], [-20, 148, 1.6]]) {
+    if (nearPad(x, z, 7)) continue;
     const g = new THREE.Group(); g.position.set(x, height(x, z) + .32, z); g.rotation.set(0, yaw, .15); scene.add(g);
     const h = new THREE.Mesh(hullGeometry(5, 1.8, .7), rowMat); h.castShadow = true; g.add(h); box(1.5, .08, .3, 0, .62, .3, deckMat, g); box(1.5, .08, .3, 0, .62, -.9, deckMat, g);
   }

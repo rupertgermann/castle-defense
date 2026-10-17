@@ -12,8 +12,8 @@ export const ENEMY_TYPES = {
   ram: { name: 'Battering Ram', hp: 1200, speed: 1.3, bounty: 45, damage: 5, armor: .4, radius: 2.1, height: 3.5 },
   warlord: { name: 'Warlord', hp: 4000, speed: 1.2, bounty: 200, damage: 10, armor: .35, radius: 1.3, height: 4.3, boss: true },
   // Every few seconds the shaman mends the wounded around it (not itself). Kill it first.
-  shaman: { name: 'War Shaman', tip: 'Mends the wounded around it. Kill it first.', hp: 200, speed: 2.4, bounty: 22, damage: 1, armor: 0, radius: .6, height: 2.9, heal: { every: 3.2, radius: 8, frac: .12, boss: .03 } },
-  outrider: { name: 'Outrider', tip: 'Armoured lancers that ride twice as fast as men on foot.', hp: 280, speed: 4.8, bounty: 18, damage: 2, armor: .35, radius: 1.0, height: 3.6 },
+  shaman: { name: 'War Shaman', tip: 'Mends the wounded around it. Kill it first.', hp: 200, speed: 2.4, bounty: 22, damage: 1, armor: 0, radius: .6, height: 2.9, heal: { every: 3.2, radius: 8, frac: .12, boss: 120 } },
+  outrider: { name: 'Outrider', tip: 'Armoured lancers that ride twice as fast as men on foot.', hp: 200, speed: 4.8, bounty: 26, damage: 1, armor: .35, radius: 1.0, height: 3.6 },
 };
 // Models are authored at true scale (man ≈ 1.85 m) and drawn 1.3× for readability from the aerial camera.
 const SCALE = 1.3;
@@ -230,14 +230,14 @@ function leak(e) {
   bus.emit('enemy:leak', { enemy: e });
 }
 
-// A shaman's pulse mends every wounded ally in reach by a share of its maximum health (bosses barely).
+// A shaman's pulse mends every wounded ally in reach by a share of its maximum health (bosses: a flat 120).
 function heal(e, h, dt) {
   e.cast = Math.max(0, (e.cast || 0) - dt * 1.4);
   e.healT = (e.healT ?? h.every * (.4 + Math.random() * .6)) - dt;
   if (e.healT > 0) return;
   const near = state.enemies.filter(o => o !== e && o.hp < o.maxHp && (o.pos.x - e.pos.x) ** 2 + (o.pos.z - e.pos.z) ** 2 <= h.radius * h.radius);
   if (!near.length) { e.healT = .4; return; }
-  for (const o of near) o.hp = Math.min(o.maxHp, o.hp + o.maxHp * (ENEMY_TYPES[o.typeId].boss ? h.boss : h.frac));
+  for (const o of near) o.hp = Math.min(o.maxHp, o.hp + (ENEMY_TYPES[o.typeId].boss ? h.boss : o.maxHp * h.frac));   // bosses: a flat trickle
   e.healT = h.every; e.cast = 1;
   bus.emit('enemy:heal', { enemy: e, pos: e.pos.clone(), radius: h.radius, targets: near });
 }

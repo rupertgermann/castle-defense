@@ -112,7 +112,8 @@ function callWave() {
   // A foe type that hasn't marched before (and has a trait worth knowing) gets named in the banner.
   const fresh = composition(state.wave).map(c => c.type).find(t => !seen.has(t) && enemies.ENEMY_TYPES[t].tip);
   for (const c of composition(state.wave)) seen.add(c.type);
-  const sub = fresh ? `${icon(fresh)} New foe: ${enemyName(fresh)}. ${enemies.ENEMY_TYPES[fresh].tip}` : bonus ? `${icon('coin')} +${bonus} for sounding the horn early` : w.boss ? 'A champion leads this host' : '';
+  const gold = bonus ? `${icon('coin')} +${bonus} for sounding the horn early` : '';
+  const sub = fresh ? `${icon(fresh)} New foe: ${enemyName(fresh)}. ${enemies.ENEMY_TYPES[fresh].tip}${gold ? `<i class="br"></i>${gold}` : ''}` : gold || (w.boss ? 'A champion leads this host' : '');
   banner(`Wave ${state.wave} of ${WAVES.length}`, w.name, sub, w.boss);
 }
 
@@ -158,7 +159,7 @@ function fitAt(az) {
   const dir = new THREE.Vector3(Math.sin(az), 0, Math.cos(az)).multiplyScalar(Math.cos(.86)).setY(Math.sin(.86));
   // Keep the whole map clear of the HUD: top bar and bottom hint in NDC.
   const topPx = $.top.offsetTop + $.top.offsetHeight + 12, botPx = 84;
-  const yTop = 1 - 2 * topPx / innerHeight, yBot = -1 + 2 * botPx / innerHeight, xLim = .95;
+  const yTop = 1 - 2 * topPx / innerHeight, yBot = -1 + 2 * botPx / innerHeight, xLim = innerWidth < innerHeight ? .9 : .95;
   const v = new THREE.Vector3();
   const bounds = dist => {
     cam.position.copy(target).addScaledVector(dir, dist); cam.lookAt(target); cam.updateMatrixWorld();
@@ -634,7 +635,7 @@ export function update(dt, realDt = dt) {
       const s = sched[si++];
       enemies.spawnEnemy(s.type, s.lane, { hpScale: s.hp * DIFFS[diffKey].hp });
     }
-    if (si >= sched.length && state.enemies.length === 0) waveClear();
+    if (si >= sched.length && state.enemies.length === 0 && state.lives > 0) waveClear();   // a last leak that ends the game is a defeat, not a repelled wave
   } else if (state.phase === 'build' && countdown != null) {
     countdown -= dt;
     if (countdown <= 0) callWave();

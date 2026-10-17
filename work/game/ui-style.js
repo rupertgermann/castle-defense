@@ -115,7 +115,8 @@ position:fixed;inset:0;pointer-events:none;font-family:var(--serif);color:var(--
 #cd .banner .t{font-size:clamp(30px,4.4vw,54px);font-weight:700;font-variant:small-caps;letter-spacing:.06em;background:linear-gradient(#fff8dc,#f2cb6b 50%,#a8741d);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 2px 0 #3a2305) drop-shadow(0 6px 14px rgba(0,0,0,.7))}
 #cd .banner.bad .t{background-image:linear-gradient(#fff0e6,#ff9d7c 45%,#a8251a)}
 #cd .banner .fl{width:240px;height:24px;color:#e7bd5a;margin:6px auto 0;display:block;filter:drop-shadow(0 1px 2px #000)}
-#cd .banner .s{font-size:17px;color:#fff1cf;font-style:italic;text-shadow:0 2px 6px #000,0 0 2px #000;margin-top:4px;display:flex;justify-content:center;align-items:center;gap:6px}
+#cd .banner .s{font-size:17px;color:#fff1cf;font-style:italic;text-shadow:0 2px 6px #000,0 0 2px #000;margin-top:4px;display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:6px}
+#cd .banner .s .br{flex-basis:100%;height:0}
 @keyframes cdBanner{0%{opacity:0;transform:translate(-50%,-30%) scale(.94);letter-spacing:.3em}12%{opacity:1;transform:translate(-50%,-50%) scale(1)}80%{opacity:1;transform:translate(-50%,-50%)}100%{opacity:0;transform:translate(-50%,-62%)}}
 
 /* ── Build menu (radial) ── */
