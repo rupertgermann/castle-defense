@@ -11,6 +11,11 @@ export const LEVELS = {
     tagline: 'The pass fort is the last wall before the lowlands. Hold it against fifteen hosts out of the snow.',
     won: 'The last war-horn dies on the wind. Frostmere holds, and the pass is sealed until the thaw.',
   },
+  saltreach: {
+    name: 'Saltreach', place: 'The Sunset Coast', crest: 'A Siege at the Edge of the Sea',
+    tagline: 'Longships on the beach, a column on the cliff road, a host on the causeway. Three roads, one gate.',
+    won: 'The tide takes the last longship. Saltreach stands, and its beacon burns on into the night.',
+  },
 };
 const asked = new URLSearchParams(location.search).get('level') || sessionStorage.getItem('cd-level');
 export const LEVEL = asked in LEVELS ? asked : 'castle';

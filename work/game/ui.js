@@ -63,7 +63,7 @@ root.innerHTML = `<style>${CSS}</style>${SPRITE}
   <div class="gsub">${levelInfo.tagline}</div>
   ${fl}
   <div class="maps" role="radiogroup" aria-label="Battlefield">${Object.entries(LEVELS).map(([k, l]) => `
-    <button class="mapbtn leather ${k === LEVEL ? 'sel' : ''}" data-a="level" data-k="${k}" role="radio" aria-checked="${k === LEVEL}">${icon(k === 'castle' ? 'tower' : 'peak')}<span><b>${l.name}</b><small>${l.place}</small></span></button>`).join('')}</div>
+    <button class="mapbtn leather ${k === LEVEL ? 'sel' : ''}" data-a="level" data-k="${k}" role="radio" aria-checked="${k === LEVEL}">${icon({ castle: 'tower', frostmere: 'peak', saltreach: 'lighthouse' }[k])}<span><b>${l.name}</b><small>${l.place}</small></span></button>`).join('')}</div>
   <div class="diff" role="radiogroup" aria-label="Difficulty">${Object.entries(DIFFS).map(([k, d]) => `
     <button class="dcard leather" data-a="diff" data-k="${k}" role="radio" aria-label="${d.name}: ${d.desc} ${d.lives} keep strength, ${Math.round(BASE_GOLD * d.gold)} starting gold, foes at ${Math.round(d.hp * 100)}% toughness">${icon(d.icon)}<h3>${d.name}</h3><p>${d.desc}</p>
     <div class="m"><span title="Keep strength">${icon('heart')}${d.lives}</span><span title="Starting gold">${icon('coin')}${Math.round(BASE_GOLD * d.gold)}</span><span title="Foe toughness">${icon('skull')}${Math.round(d.hp * 100)}%</span></div></button>`).join('')}</div>

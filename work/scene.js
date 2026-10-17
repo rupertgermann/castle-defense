@@ -14,6 +14,7 @@ import { CopyShader } from 'three/addons/shaders/CopyShader.js';
 import { LEVEL } from './level.js';
 import { buildCastle } from './worlds/castle.js';
 import { buildFrostmere } from './worlds/frostmere.js';
+import { buildSaltreach } from './worlds/saltreach.js';
 
 const scene = new THREE.Scene();
 // No canvas MSAA: the composer's targets antialias the scene; the canvas only gets a fullscreen quad.
@@ -250,7 +251,7 @@ function pitchedRoof(w, d, h, x, y, z, parent = scene) {
 
 // ---- the world for this level: terrain, lighting, landmarks and everything the game reads from it ----
 const kit = { THREE, scene, renderer, rand, between, clamp, smooth, hash, noise, fbm, canvasTexture, stoneMaps, materials, instance, unitBox, worldUV, mesh, box, cylinder, beam, archPath, facade, tiledCone, pitchedRoof, mergeGeometries, Water };
-const world = (LEVEL === 'frostmere' ? buildFrostmere : buildCastle)(kit);
+const world = ({ frostmere: buildFrostmere, saltreach: buildSaltreach }[LEVEL] || buildCastle)(kit);
 const { height, BASE, gateCenter, sun, terrain, water, treeLocations, bridgeDeck, lanePaths, laneNames, padSpots, titleView, fortPoints } = world;
 const initialPosition = world.view.position.clone();
 camera.position.copy(initialPosition); controls.target.copy(world.view.target); controls.update();
