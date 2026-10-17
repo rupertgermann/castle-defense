@@ -10,10 +10,13 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { Water } from 'three/addons/objects/Water.js';
 import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
+import { CopyShader } from 'three/addons/shaders/CopyShader.js';
 
 const scene = new THREE.Scene();
-const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 1.6));
+// No canvas MSAA: the composer's targets antialias the scene; the canvas only gets a fullscreen quad.
+// Default power preference so dual-GPU Macs can stay on the integrated GPU.
+const renderer = new THREE.WebGLRenderer({ antialias: false });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.25));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -470,8 +473,10 @@ const pathMat = new THREE.MeshStandardMaterial({ color: '#ac9c79', roughness: 1,
 pathRibbon([[-9, 28], [-10, 41], [1, 54], [26, 56], [48, 53], [64, 52]], 4.5, pathMat);
 pathRibbon([[99, 51], [116, 56], [137, 76], [163, 123], [160, 200]], 5, pathMat);
 
+// Sunk so the deck sits flush with the banks (~6.3 west, ~6.9 east) instead of towering over the road.
+const BRIDGE_DROP = -4.2;
 function bridge() {
-  const z = 52, x0 = 57, x1 = 104, h = 9.8, group = new THREE.Group(); group.position.z = z; scene.add(group);
+  const z = 52, x0 = 57, x1 = 104, h = 9.8, group = new THREE.Group(); group.position.set(0, BRIDGE_DROP, z); scene.add(group);
   for (let j = 0; j < 4; j++) {
     const center = x0 + (j + .5) * (x1 - x0) / 4, half = (x1 - x0) / 8, r = 4.35, cy = 3.05;
     const shape = new THREE.Shape();
@@ -582,8 +587,9 @@ function treeTemplate(kind, detailed = true) {
   for (let i = 0; i < 11; i++) {
     const a = i * 2.39996, y = H * between(.35, .78), r = kind === 2 ? between(1.4, 2.3) : between(2.1, 3.5);
     const end = [Math.cos(a) * r, y + between(.6, 2.0), Math.sin(a) * r];
-    branch([.12, y - 1.4, 0], end, .14, .035);
-    const crown = new THREE.IcosahedronGeometry(kind === 2 ? 1.42 : 1.85, detailed ? 3 : 1);
+    // Far trees (~3300 instances, drawn ~4x a frame: main, reflection, AO normals) skip hidden side branches and use low-poly crowns.
+    if (detailed) branch([.12, y - 1.4, 0], end, .14, .035);
+    const crown = new THREE.IcosahedronGeometry((kind === 2 ? 1.42 : 1.85) * (detailed ? 1 : 1.12), detailed ? 3 : 0); // 1.12: flat faces sit inside the sphere
     const cp = crown.attributes.position, cc = [];
     for (let k = 0; k < cp.count; k++) {
       const px = cp.getX(k), py = cp.getY(k), pz = cp.getZ(k);
@@ -683,14 +689,26 @@ for (const b of staticParts.values()) { const o = mesh(mergeGeometries(b.geometr
 finishInstances();
 
 const composer = new EffectComposer(renderer);
-composer.renderTarget1.samples = 4; composer.renderTarget2.samples = 4;
-composer.addPass(new RenderPass(scene, camera));
-const ao = new GTAOPass(scene, camera, innerWidth, innerHeight);
+// MSAA only on the scene render, then one copy into the composer chain. MSAA on both ping-pong targets made
+// every post pass write and resolve 4x samples (~10ms/frame at Retina).
+class MsaaRenderPass extends RenderPass {
+  msaa = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
+  copy = new ShaderPass(CopyShader);
+  setSize(w, h) { this.msaa.setSize(w, h); }
+  render(r, write, read, dt, mask) { super.render(r, write, this.msaa, dt, mask); this.copy.render(r, read, this.msaa); }
+}
+composer.addPass(new MsaaRenderPass(scene, camera));
+// AO and bloom are soft; half resolution is visually the same at a fraction of the fill cost.
+const halfRes = pass => { const set = pass.setSize; pass.setSize = (w, h) => set.call(pass, w / 2, h / 2); return pass; };
+const ao = halfRes(new GTAOPass(scene, camera, innerWidth, innerHeight));
 ao.blendIntensity = .55;
 ao.updateGtaoMaterial({ radius: 2.0, thickness: 1.2, distanceExponent: 1.2, distanceFallOff: 1, scale: 1, samples: 8 });
 ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 4, rings: 2, samples: 8 });
 composer.addPass(ao);
-const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), .15, .5, 1.45); composer.addPass(bloom);
+// Water re-renders the scene for its reflection in onBeforeRender, which also fired during AO's normal pass: skip it there.
+const reflect = water.onBeforeRender;
+water.onBeforeRender = function (r, ...rest) { if (r.getRenderTarget() !== ao.normalRenderTarget) reflect.call(this, r, ...rest); };
+const bloom = halfRes(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), .15, .5, 1.45)); composer.addPass(bloom);
 const grade = new ShaderPass({
   uniforms: { tDiffuse: { value: null }, tDepth: { value: ao.depthTexture }, inverseProjection: { value: camera.projectionMatrixInverse }, cameraWorld: { value: camera.matrixWorld }, mistColor: { value: new THREE.Color('#b4c2bc') } },
   vertexShader: 'varying vec2 vUv; void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
@@ -711,6 +729,7 @@ const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 function render(now) {
   requestAnimationFrame(render);
   if (document.hidden) { lastFrame = now; return; }
+  if (now - lastFrame < 15) return; // cap at ~60fps; 120Hz displays would otherwise run every post pass twice as often
   const dt = Math.min(.1, Math.max(0, now - lastFrame) * .001);
   lastFrame = now;
   const time = (now - start) * .001;
@@ -774,5 +793,5 @@ export const pathPoints = {
   eastRoad: [[99, 51], [116, 56], [137, 76], [163, 123], [160, 200]],
   southRoad: [[2, 52], [6, 75], [13, 100], [14, 152], [-6, 218], [-20, 320]],
 };
-export const bridgeDeck = { x0: 57, x1: 104, z: 52, halfWidth: 3.1, y: 9.925 };
+export const bridgeDeck = { x0: 57, x1: 104, z: 52, halfWidth: 3.1, y: 9.925 + BRIDGE_DROP };
 export { THREE, roadX, scene, camera, controls, renderer, composer, sun, terrain, water, materials, stoneMaps, height, riverX, riverWidth, noise, fbm, BASE, gateCenter, treeLocations, box, cylinder, beam, tiledCone, pitchedRoof, facade, mesh, worldUV, unitBox, initialPosition };

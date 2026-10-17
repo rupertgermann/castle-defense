@@ -1,8 +1,8 @@
-// Towers: build pads, four tower types with three levels, targeting, projectiles and damage.
+// Towers: build pads, five tower types with three levels, targeting, projectiles and damage.
 import { THREE, scene, camera, renderer, composer, height, clearTrees, bridgeDeck } from '../scene.js';
 import { state, bus, lanes } from './core.js';
 import { damageEnemy, enemiesInRadius, ENEMY_TYPES } from './enemies.js';
-import { instantiate, ghost, scaffold, padGeometry, runeTexture, projectileGeometries, poseArcher, poseBallista, glowTexture, renderArchers, liveArchers } from './towers-models.js';
+import { instantiate, ghost, scaffold, padGeometry, runeTexture, projectileGeometries, poseArcher, poseBallista, glowTexture, renderArchers, liveArchers, MANGONEL } from './towers-models.js';
 
 export const TOWER_TYPES = {
   archer: {
@@ -39,6 +39,17 @@ export const TOWER_TYPES = {
       { cost: 150, damage: 80, range: 24, rate: .42, armorPierce: .6 },
       { cost: 190, damage: 125, range: 27, rate: .48, armorPierce: .7 },
       { cost: 260, damage: 190, range: 30, rate: .55, armorPierce: .8 },
+    ],
+  },
+  // Area denial: pots shatter into burning pitch that hurts everything walking through it. Fire ignores armour;
+  // overlapping pools don't stack (each foe burns from the hottest pool it stands in).
+  cauldron: {
+    name: 'Pitch Cauldron', damageType: 'fire', projectile: 'firepot',
+    description: 'A mangonel lobs pots of burning pitch. They leave pools of fire on the road that scorch every foe that crosses.',
+    levels: [
+      { cost: 110, damage: 10, range: 15, rate: .38, burn: { dps: 16, radius: 3, duration: 4 } },
+      { cost: 150, damage: 16, range: 16.5, rate: .42, burn: { dps: 25, radius: 3.5, duration: 4.5 } },
+      { cost: 210, damage: 24, range: 18, rate: .46, burn: { dps: 38, radius: 4.2, duration: 5 } },
     ],
   },
 };
@@ -279,10 +290,10 @@ function lead(from, e, flightTime, out) {
   return T;
 }
 const FLIGHT = {
-  arrow: d => .22 + d / 42, cannonball: d => .5 + d / 26, bolt: d => .05 + d / 85, arcane: d => d / 20,
+  arrow: d => .22 + d / 42, cannonball: d => .5 + d / 26, bolt: d => .05 + d / 85, arcane: d => d / 20, firepot: d => .8 + d / 22,
 };
-const GRAV = { arrow: 22, cannonball: 20, bolt: 4 };
-const TURN = { archer: 7, cannon: 2.2, ballista: 3, mage: 99 };
+const GRAV = { arrow: 22, cannonball: 20, bolt: 4, firepot: 22 };
+const TURN = { archer: 7, cannon: 2.2, ballista: 3, mage: 99, cauldron: 2.4 };
 
 function angleDiff(a, b) { let d = (b - a) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return d; }
 const aimTmp = new THREE.Vector3(), fromTmp = new THREE.Vector3();
@@ -344,6 +355,17 @@ function idle(tower, dt, engaged) {
     const draw = _.cooldown <= 0 ? 1 : sinceFire < .12 ? 1 - sinceFire / .12 : Math.min(1, (sinceFire - .35) / Math.max(.3, period - .6));
     poseBallista(m.turret, Math.max(0, draw), _.cooldown <= 0 || sinceFire > period * .6);
   }
+  if (m.arm) {
+    // snap forward against the stop beam, hang there a moment, then winch slowly back down; reload the cup near the end
+    const period = 1 / s.rate, since = period - Math.max(0, _.cooldown), { rest, thrown } = MANGONEL;
+    const k = _.cooldown <= 0 || !_.fired ? 0 : since < .14 ? 1 - (1 - since / .14) ** 2 : since < .45 ? 1 : Math.max(0, 1 - (since - .45) / Math.max(.3, period - .9));
+    m.arm.rotation.x = rest + (thrown - rest) * k + (since < .45 && _.fired ? Math.sin(since * 40) * .04 * (1 - since / .45) : 0);
+    m.pot.visible = !_.fired || k < .05;
+  }
+  if (m.fire) {
+    const f = .8 + .12 * Math.sin(_.t * 9.1) + .08 * Math.sin(_.t * 23.7 + 1) + .1 * Math.sin(_.t * 3.3);
+    m.fire.material.opacity = .42 * f; m.fire.scale.setScalar(m.fire.userData.size * (.9 + .15 * f));
+  }
   if (m.crystal) {
     _.flare = Math.max(0, _.flare - dt * 2.2);
     const c = m.crystal, core = c.getObjectByName('core'), orbit = c.getObjectByName('orbit'), ring = c.getObjectByName('ring'), glow = c.getObjectByName('glow');
@@ -369,6 +391,7 @@ function makeProjectiles() {
     arrow: new THREE.InstancedMesh(geo.arrow, new THREE.MeshStandardMaterial({ color: '#b9a57e', roughness: .8 }), 400),
     bolt: new THREE.InstancedMesh(geo.bolt, new THREE.MeshStandardMaterial({ color: '#5a4630', roughness: .7, metalness: .2 }), 80),
     cannonball: new THREE.InstancedMesh(geo.ball, new THREE.MeshStandardMaterial({ color: '#2a2b28', metalness: .5, roughness: .5 }), 120),
+    firepot: new THREE.InstancedMesh(geo.pot, new THREE.MeshStandardMaterial({ color: '#7d5236', roughness: .9, emissive: '#ff5a18', emissiveIntensity: .35 }), 60),
     arcane: new THREE.InstancedMesh(geo.orb, orbMat, 1200),
   };
   for (const p of Object.values(pools)) { p.count = 0; p.frustumCulled = false; p.castShadow = false; p.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(p); }
@@ -379,14 +402,15 @@ function fire(tower, target) {
   const _ = tower._, type = TOWER_TYPES[tower.typeId], s = stat(tower), kind = type.projectile;
   const from = muzzleWorld(tower, new THREE.Vector3());
   const to = new THREE.Vector3(), T = lead(from, target, FLIGHT[kind], to);
-  const p = { kind, tower, target, from, to, T, t: 0, pos: from.clone(), prev: from.clone(), vel: new THREE.Vector3(), damage: s.damage, splash: s.splash || 0, slow: s.slow || null, armorPierce: s.armorPierce || 0, trail: [] };
-  if (kind === 'cannonball') to.y -= (target.height || 1.6) * .6;
+  const p = { kind, tower, target, from, to, T, t: 0, pos: from.clone(), prev: from.clone(), vel: new THREE.Vector3(), damage: s.damage, splash: s.splash || 0, slow: s.slow || null, armorPierce: s.armorPierce || 0, burn: s.burn || null, trail: [] };
+  if (kind === 'cannonball' || kind === 'firepot') to.y -= (target.height || 1.6) * .6;
   if (kind === 'arcane') { p.vel.subVectors(to, from).normalize().multiplyScalar(9).y += 7; p.T = 3.5; p.wob = Math.random() * 6; }
   else ballisticVelocity(from, to, T, GRAV[kind], p.vel);
   p.v0 = p.vel.clone();
   projectiles.list.push(p);
   if (m(tower).archers) { _.shooter++; }
   if (kind === 'cannonball') _.recoil = 1;
+  if (kind === 'firepot') _.fired = true;
   if (kind === 'arcane') _.flare = 1;
   bus.emit('tower:fire', { tower, from: from.clone(), target, projectile: kind });
 }
@@ -415,14 +439,21 @@ function updateProjectiles(dt) {
       if (p.t >= p.T) done = true;
     }
     p.vel.subVectors(p.pos, p.prev);
-    if (p.kind === 'arcane') { p.trail.unshift(p.pos.clone()); if (p.trail.length > 14) p.trail.pop(); }
+    if (p.kind === 'arcane' || p.kind === 'firepot') { p.trail.unshift(p.pos.clone()); if (p.trail.length > (p.kind === 'arcane' ? 14 : 8)) p.trail.pop(); }
     if (done) { impact(p); L.splice(i, 1); }
   }
   // render pools
   const { pools, dummy, color } = projectiles;
-  const counts = { arrow: 0, bolt: 0, cannonball: 0, arcane: 0 };
+  const counts = { arrow: 0, bolt: 0, cannonball: 0, arcane: 0, firepot: 0 };
   for (const p of L) {
     const pool = pools[p.kind];
+    if (p.kind === 'firepot') // burning wick: a short ember trail drawn with the additive orb pool
+      for (let k = 0; k < p.trail.length && counts.arcane < 1200; k++) {
+        const f = 1 - k / p.trail.length;
+        dummy.position.copy(p.trail[k]); dummy.quaternion.copy(camera.quaternion); dummy.scale.setScalar(k ? .9 * f + .2 : 1.5);
+        dummy.updateMatrix(); pools.arcane.setMatrixAt(counts.arcane, dummy.matrix);
+        color.setRGB(2.2, .85, .25).multiplyScalar(k ? f * .6 : 1); pools.arcane.setColorAt(counts.arcane, color); counts.arcane++;
+      }
     if (p.kind === 'arcane') {
       for (let k = 0; k < p.trail.length && counts.arcane < 1200; k++) {
         const f = 1 - k / p.trail.length;
@@ -436,6 +467,7 @@ function updateProjectiles(dt) {
     dummy.position.copy(p.pos);
     if (p.vel.lengthSq() > 1e-8) dummy.quaternion.setFromUnitVectors(_zAxis, tmp.copy(p.vel).normalize()); else dummy.quaternion.identity();
     dummy.scale.setScalar(p.kind === 'arrow' ? 1.6 : p.kind === 'cannonball' ? 1.15 : 1.1);
+    if (p.kind === 'firepot') dummy.quaternion.setFromAxisAngle(_zAxis, p.t * 9);
     dummy.updateMatrix(); pool.setMatrixAt(counts[p.kind]++, dummy.matrix);
   }
   for (const k in pools) { pools[k].count = counts[k]; pools[k].instanceMatrix.needsUpdate = true; if (pools[k].instanceColor) pools[k].instanceColor.needsUpdate = true; }
@@ -445,6 +477,14 @@ function impact(p) {
   const tower = p.tower, pos = p.pos.clone();
   let radius = .6;
   const hit = (e, amount, opts) => { if (damageEnemy(e, amount, opts) && !tower._.dead) tower.kills++; };
+  if (p.kind === 'firepot') {
+    const b = p.burn; radius = b.radius;
+    pos.y = groundY(pos.x, pos.z);
+    for (const e of enemiesInRadius(pos, b.radius)) hit(e, p.damage, { type: 'fire' });
+    burning.push({ pos, radius: b.radius, dps: b.dps, t: 0, dur: b.duration, tower, mesh: poolMesh(pos, b.radius) });
+    bus.emit('projectile:impact', { pos, projectile: p.kind, radius, target: p.target, duration: b.duration });
+    return;
+  }
   if (p.kind === 'cannonball') {
     radius = p.splash;
     pos.y = Math.max(pos.y, groundY(pos.x, pos.z));
@@ -465,6 +505,46 @@ function impact(p) {
   bus.emit('projectile:impact', { pos, projectile: p.kind, radius, target: p.target });
 }
 
+// ---------------- burning pitch ----------------
+// Damage ticks four times a second; each foe takes the hottest pool it stands in.
+const burning = [], BURN_TICK = .25;
+let burnClock = 0, poolMat;
+// The readable damage zone: a molten, flickering disc draped over the ground, exactly radius-sized, alive exactly as long as the damage.
+function poolMesh(pos, r) {
+  poolMat ||= new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
+    uniforms: { life: { value: 0 }, time: { value: 0 }, seed: { value: 0 } },
+    vertexShader: 'varying vec2 vP; void main(){ vP = uv * 2. - 1.; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
+    fragmentShader: `uniform float life, time, seed; varying vec2 vP;
+      float n(vec2 p){ return sin(p.x * 3.1 + seed) * sin(p.y * 2.7 - seed * .7) * .5 + sin(p.x * 7.3 - p.y * 5.1 + time * 1.7) * .25 + sin(length(p) * 9. - time * 2.6 + seed) * .25; }
+      void main(){
+        float r = length(vP), k = n(vP * 2.), edge = 1. - smoothstep(.62 + .16 * k, 1., r);
+        float fade = smoothstep(0., .05, life) * (1. - smoothstep(.72, 1., life));
+        float flick = .78 + .22 * sin(time * 11. + r * 6. + seed) * sin(time * 7.3 + k * 4.);
+        vec3 c = mix(vec3(1.2, .18, .02), vec3(2.0, .62, .1), smoothstep(-.2, .8, k)) * flick;
+        gl_FragColor = vec4(c, edge * fade * (.45 + .4 * k)); }`,
+  });
+  const g = new THREE.PlaneGeometry(2 * r, 2 * r, 10, 10).rotateX(-Math.PI / 2), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) p.setY(i, groundY(pos.x + p.getX(i), pos.z + p.getZ(i)) - pos.y + .12);
+  const m = new THREE.Mesh(g, poolMat.clone()); m.position.copy(pos); m.renderOrder = 2; m.frustumCulled = false;
+  m.material.uniforms.seed.value = Math.random() * 6.28; scene.add(m);
+  return m;
+}
+function updateBurning(dt) {
+  for (let i = burning.length - 1; i >= 0; i--) {
+    const b = burning[i], u = b.mesh.material.uniforms;
+    b.t += dt; u.life.value = b.t / b.dur; u.time.value = glowTime;
+    if (b.t >= b.dur) { b.mesh.removeFromParent(); b.mesh.geometry.dispose(); b.mesh.material.dispose(); burning.splice(i, 1); }
+  }
+  if (!burning.length || (burnClock += dt) < BURN_TICK) return;
+  burnClock -= BURN_TICK;
+  for (const e of state.enemies.slice()) {
+    let best = null;
+    for (const b of burning) if ((!best || b.dps > best.dps) && Math.hypot(e.pos.x - b.pos.x, e.pos.z - b.pos.z) <= b.radius + (e.radius || .5) * .5) best = b;
+    if (best && damageEnemy(e, best.dps * BURN_TICK, { type: 'fire' }) && !best.tower._.dead) best.tower.kills++;
+  }
+}
+
 // ---------------- frame ----------------
 let glowTime = 0;
 export function update(dt) {
@@ -472,6 +552,7 @@ export function update(dt) {
   for (const t of state.towers) updateTower(t, dt);
   for (let i = sinking.length - 1; i >= 0; i--) { const t = sinking[i]; if (t._.anim) animate(t, dt); else sinking.splice(i, 1); }
   updateProjectiles(dt);
+  updateBurning(dt);
   renderArchers(scene);
   // pad rune rings ease toward their target glow; selected pulse gently
   const real = performance.now() * .001;
@@ -494,7 +575,7 @@ export const debug = {
     const types = Object.keys(TOWER_TYPES);
     pads.forEach((pad, i) => {
       if (pad.tower || i % 6 === 5) return;
-      const t = buildTower(pad, types[i % 4], { instant: !animate, free: true });
+      const t = buildTower(pad, types[i % types.length], { instant: !animate, free: true });
       for (let l = 0; l < (i >> 2) % 3; l++) upgradeTower(t, { instant: !animate, free: true });
     });
     return state.towers.length;
@@ -508,4 +589,7 @@ export const debug = {
     return t;
   },
   projectiles: () => projectiles.list.length,
+  burning: () => burning.length,
+  // A damage-free pool of burning pitch at pos (visual check without waiting for a tower to fire).
+  burnAt: (pos, radius = 3, dur = 4) => { const p = pos.clone(); p.y = groundY(p.x, p.z); burning.push({ pos: p, radius, dps: 0, t: 0, dur, tower: { _: { dead: true } }, mesh: poolMesh(p, radius) }); },
 };

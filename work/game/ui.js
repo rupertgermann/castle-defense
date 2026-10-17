@@ -20,12 +20,12 @@ const ENEMY_NAMES = { raider: 'Raider', hound: 'War Hound', manatarms: 'Man-at-A
 const enemyName = id => enemies.ENEMY_TYPES?.[id]?.name || ENEMY_NAMES[id] || id;
 const enemyIcon = id => (id in ENEMY_NAMES ? id : 'skull');
 const isBoss = id => enemies.ENEMY_TYPES?.[id]?.boss ?? id === 'warlord';
-const TOWER_ICONS = [[/arch|bow|long/, 'archer'], [/cannon|bomb|mortar|cata/, 'cannon'], [/mage|arcan|wiz|spire|magic/, 'mage'], [/ball|bolt|cross|scorp/, 'ballista']];
+const TOWER_ICONS = [[/cauldron|pitch|fire/, 'cauldron'], [/arch|bow|long/, 'archer'], [/cannon|bomb|mortar|cata/, 'cannon'], [/mage|arcan|wiz|spire|magic/, 'mage'], [/ball|bolt|cross|scorp/, 'ballista']];
 function towerIcon(id) {
   const def = TT()[id] || {}, key = `${id} ${def.name || ''}`.toLowerCase();
   return TOWER_ICONS.find(([re]) => re.test(key))?.[1] || { blast: 'cannon', magic: 'mage' }[def.damageType] || 'tower';
 }
-const DTYPE = { pierce: 'Piercing', blast: 'Blast', magic: 'Arcane' };
+const DTYPE = { pierce: 'Piercing', blast: 'Blast', magic: 'Arcane', fire: 'Fire' };
 const upgradeCostOf = t => towers.upgradeCost ? towers.upgradeCost(t) : TT()[t.typeId]?.levels[t.level + 1]?.cost ?? null;
 const sellValueOf = t => towers.sellValue ? towers.sellValue(t) : Math.round((t.spent || 0) * .6);
 
@@ -77,7 +77,7 @@ root.innerHTML = `<style>${CSS}</style>${SPRITE}
     <button class="dcard leather" data-a="diff" data-k="${k}" role="radio">${icon(d.icon)}<h3>${d.name}</h3><p>${d.desc}</p>
     <div class="m"><span>${icon('heart')}${d.lives}</span><span>${icon('coin')}${Math.round(BASE_GOLD * d.gold)}</span><span>${icon('skull')}${Math.round(d.hp * 100)}%</span></div></button>`).join('')}</div>
   <button class="cta" data-a="begin">Defend the Keep</button>
-  <div class="how">Raise towers on the stone build sites beside the roads. Sound the horn early for bonus gold.<span class="desk"><br><kbd>Space</kbd> horn · <kbd>1</kbd>–<kbd>4</kbd> build · <kbd>U</kbd> upgrade · <kbd>S</kbd> sell · <kbd>F</kbd> speed · <kbd>P</kbd> pause</span></div>
+  <div class="how">Raise towers on the stone build sites beside the roads. Sound the horn early for bonus gold.<span class="desk"><br><kbd>Space</kbd> horn · <kbd>1</kbd>–<kbd>5</kbd> build · <kbd>U</kbd> upgrade · <kbd>S</kbd> sell · <kbd>F</kbd> speed · <kbd>P</kbd> pause</span></div>
 </div>
 <div class="screen end" data-r="end"></div>`;
 document.body.appendChild(root);
@@ -265,7 +265,7 @@ function deselect() {
 let anchor = null, cardEl = null, cardKind = null, cardKey = '';
 function openBuild(pad) {
   anchor = pad.pos; cardEl = null; $.cards.innerHTML = ''; cardKind = 'build';
-  const ids = Object.keys(TT()).slice(0, 4), n = ids.length, R = innerWidth <= 760 ? 74 : 72;
+  const ids = Object.keys(TT()).slice(0, 9), n = ids.length, R = innerWidth <= 760 ? 74 : 72;
   $.bm.innerHTML = `<div class="bm-ring"></div>` + ids.map((id, i) => {
     const a = (-135 + i * 360 / Math.max(n, 1)) * Math.PI / 180, x = Math.round(Math.cos(a) * R), y = Math.round(Math.sin(a) * R), c = TT()[id].levels[0].cost;
     return `<button class="bm-opt" data-a="build" data-t="${id}" style="left:${x}px;top:${y}px;--fx:${-x}px;--fy:${-y}px;animation-delay:${i * 40}ms" aria-label="Build ${TT()[id].name}, ${c} gold">
@@ -279,7 +279,8 @@ function refreshAfford() {
 }
 const statRows = (L, N) => [['dmg', 'Damage', L.damage, N?.damage, 0], ['range', 'Range', L.range, N?.range, 0, ' m'], ['rate', 'Rate', L.rate, N?.rate, 2, '/s']]
   .map(([ic, k, v, nv, dp, u = '']) => `${icon(ic)}<span>${k}</span><b>${+(+v).toFixed(dp)}${u}${nv != null && nv !== v ? `<em>▲ ${+(nv - v).toFixed(dp)}</em>` : ''}</b>`).join('')
-  + (L.splash ? `${icon('blast')}<span>Splash</span><b>${L.splash} m</b>` : '') + (L.slow ? `${icon('magic')}<span>Slows</span><b>${Math.round((1 - L.slow.factor) * 100)}%</b>` : '');
+  + (L.splash ? `${icon('blast')}<span>Splash</span><b>${L.splash} m</b>` : '') + (L.slow ? `${icon('magic')}<span>Slows</span><b>${Math.round((1 - L.slow.factor) * 100)}%</b>` : '')
+  + (L.burn ? `${icon('fire')}<span>Burns</span><b>${L.burn.dps}/s · ${L.burn.duration} s${N?.burn && N.burn.dps !== L.burn.dps ? `<em>▲ ${N.burn.dps - L.burn.dps}</em>` : ''}</b>` : '');
 const cardHead = (id, def, extra = '') => `<div class="card-h"><span class="med">${icon(towerIcon(id))}</span><div><div class="nm">${def.name}</div>
   <div class="dt ${def.damageType}">${icon(def.damageType in DTYPE ? def.damageType : 'pierce')}${DTYPE[def.damageType] || def.damageType || ''} damage</div>${extra}</div>
   <button class="x" data-a="close" aria-label="Close">${icon('close')}</button></div>`;
@@ -397,7 +398,7 @@ function refreshHud(realDt) {
   // Contextual hint.
   const k = (d, t = d) => touch ? t : d;
   const sel = state.selected;
-  const hint = sel?.kind === 'pad' ? k('Hover a tower to preview its reach. Click or press <kbd>1</kbd>–<kbd>4</kbd> to build.', 'Tap a tower to preview it, tap Build to raise it.')
+  const hint = sel?.kind === 'pad' ? k('Hover a tower to preview its reach. Click or press <kbd>1</kbd>–<kbd>5</kbd> to build.', 'Tap a tower to preview it, tap Build to raise it.')
     : sel?.kind === 'tower' ? k('<kbd>U</kbd> upgrade · <kbd>S</kbd> sell · <kbd>Esc</kbd> close', 'Upgrade or sell this tower. Tap the ground to close.')
     : fighting ? k('Click a tower to upgrade it mid-battle. <kbd>F</kbd> hastens the fight, <kbd>P</kbd> pauses.', 'Tap a tower to upgrade it mid-battle.')
     : countdown != null ? 'Sound the horn early — every second saved is gold for the treasury.'
@@ -498,7 +499,7 @@ addEventListener('keydown', e => {
   else if (key === 'escape') { if (state.selected) deselect(); else if (state.paused) toggle('pause'); }
   else if (key === 'u') upgrade();
   else if (key === 's') sell();
-  else if (key >= '1' && key <= '4' && state.selected?.kind === 'pad') build(Object.keys(TT())[key - 1]);
+  else if (key >= '1' && key <= '9' && state.selected?.kind === 'pad' && Object.keys(TT())[key - 1]) build(Object.keys(TT())[key - 1]);
   else if (key === 'home' || key === 'o') flyTo('overview');
 });
 

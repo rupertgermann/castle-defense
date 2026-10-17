@@ -259,7 +259,7 @@ function updateCoins(dt) {
 
 // ───────────────────────────── emitters ─────────────────────────────
 // Continuous spawners. Transient ones come from a pool; persistent ones (chimneys, castle fires, pollen) live forever.
-const EPOOL = Array.from({ length: 64 }, () => ({ on: false }));
+const EPOOL = Array.from({ length: 128 }, () => ({ on: false }));
 const persistent = [];
 const E = (pr, x, y, z, rate, dur = 0, sc = 1, extra = null) => ({ on: true, pr, x, y, z, rate, dur, sc, t: 0, acc: 0, vx: 0, vy: 0, vz: 0, grav: 0, end: null, color: null, jitter: 0, ...extra });
 function emitter(pr, x, y, z, rate, dur, sc = 1, extra = null) {
@@ -268,7 +268,7 @@ function emitter(pr, x, y, z, rate, dur, sc = 1, extra = null) {
 function runEmitter(e, dt, k = 1) {
   e.t += dt;
   if (e.vx || e.vy || e.vz) { e.vy -= e.grav * dt; e.x += e.vx * dt; e.y += e.vy * dt; e.z += e.vz * dt; }
-  const fade = e.dur ? Math.max(0, 1 - e.t / e.dur) : 1;
+  const fade = e.dur ? Math.max(0, Math.min(1, (1 - e.t / e.dur) / (e.hold || 1))) : 1;   // hold: fade only over that last fraction
   e.acc += e.rate * k * fade * dt;
   while (e.acc >= 1) { e.acc--; burst(e.pr, e.x + (R() - .5) * e.jitter, e.y, e.z + (R() - .5) * e.jitter, e.sc, 1, 0, 1, 0, e.color, e.color ? EMBER_END : null); }
   if (e.dur && e.t >= e.dur) { e.on = false; if (e.end === 'firework') fireworkBurst(e.x, e.y, e.z); }
@@ -282,7 +282,8 @@ function flash(pos, color, peak, dur, y = 2) {
   f.light.color.set(color); f.light.position.set(pos.x, pos.y + y, pos.z); f.peak = peak; f.t = 0; f.dur = dur;
 }
 let trauma = 0, shakeTime = 0, shaking = false;
-export function shake(strength = .5) { if (!reducedMotion) trauma = Math.min(1.2, trauma + strength); }
+// Overlapping events don't stack linearly: the strongest wins, extras add a little with diminishing returns.
+export function shake(strength = .5) { if (!reducedMotion) trauma = trauma < strength ? strength : Math.min(1, trauma + strength * .2 * (1 - trauma)); }
 function shakeAt(pos, strength) { shake(strength * Math.min(1.4, Math.max(.12, 110 / camera.position.distanceTo(pos)))); }
 function updateShake(realDt) {
   shakeTime += realDt;
@@ -378,11 +379,28 @@ function arcane(p, radius = 2.5) {
   decal(0, p.x, g, p.z, 2 * s, 6, .5, FROST, .15, 0);
   flash(p, '#b08cff', 350 * s, .45);
 }
-function impact(p, id, radius, target) {
+// Pitch pot: a whoomph of flame, then a pool of fire that burns for `dur` seconds (towers own the damage).
+function firepot(p, radius = 3, dur = 4) {
+  const s = radius / 3, g = groundAt(p.x, p.z), j = radius * 1.5;
+  burst(PR.flameCore, p.x, g + .7, p.z, s * 1.5); burst(PR.fireball, p.x, g + .9, p.z, s * .55, 10);
+  burst(PR.sparks, p.x, g + .4, p.z, s * .6, 16); burst(PR.groundDust, p.x, g + .3, p.z, s * .5, 6);
+  debris(p.x, g + .3, p.z, 6, 6, [DEBRIS.wood, DEBRIS.char], .1, .2, 0, true);
+  decal(0, p.x, g, p.z, radius * 1.15, dur + 8, .85, SCORCH, 0, 1);
+  const hold = { jitter: j, hold: .3 };
+  emitter(PR.flame, p.x, g, p.z, 26 * s * s, dur, s * .75, hold);
+  emitter(PR.flameCore, p.x, g + .2, p.z, 10 * s * s, dur, s * .8, { ...hold, jitter: j * .8 });
+  emitter(PR.fireGlow, p.x, g + .3, p.z, 3 * s, dur, s, { ...hold, jitter: j * .6 });
+  emitter(PR.ember, p.x, g + .5, p.z, 14 * s, dur, 1, hold);
+  emitter(PR.plume, p.x, g + 2, p.z, 1.6, dur, s * .6, { ...hold, jitter: j * .5 });
+  flash(p, '#ff8a3a', 450 * s, .45);
+  shakeAt(p, .12 * s);
+}
+function impact(p, id, radius, target, duration) {
   const g = groundAt(p.x, p.z);
   switch (id) {
     case 'cannonball': return explosion(p, radius || 3);
     case 'arcane': return arcane(p, radius || 2.5);
+    case 'firepot': return firepot(p, radius || 3, duration || 4);
     case 'arrow':
       burst(PR.puff, p.x, Math.max(p.y, g + .2), p.z, target ? .7 : 1);
       burst(PR.splinter, p.x, p.y, p.z, 1, target ? 3 : 5);
@@ -409,6 +427,7 @@ function towerFire({ tower, from, target, projectile }) {
       flash(f, '#ffc27a', 150, .15, .5); shakeAt(f, .08); return;
     case 'bolt': burst(PR.twang, f.x, f.y - .3, f.z); burst(PR.arrowDust, f.x, f.y, f.z, 1, 3, v1.x, v1.y, v1.z); return;
     case 'arcane': burst(PR.charge, f.x, f.y, f.z); burst(PR.chargeIn, f.x, f.y, f.z); return;
+    case 'firepot': burst(PR.flameCore, f.x, f.y, f.z, .6); burst(PR.ember, f.x, f.y, f.z, 1, 8); burst(PR.twang, f.x, f.y - 1.5, f.z); return;
     default: burst(PR.arrowDust, f.x, f.y, f.z, 1, 2, v1.x, v1.y, v1.z);
   }
 }
@@ -416,6 +435,7 @@ const armorOf = e => e.armor ?? enemiesMod.ENEMY_TYPES?.[e.typeId]?.armor ?? 0;
 function enemyHit({ enemy, pos, damageType }) {
   const p = pos || v2.copy(enemy.pos).setY(enemy.pos.y + enemy.height * .6);
   if (damageType === 'magic') { burst(PR.sparkle, p.x, p.y, p.z, .35, 5); return; }
+  if (damageType === 'fire') { burst(PR.ember, p.x, p.y, p.z, 1, 3); burst(PR.flameCore, p.x, p.y - .3, p.z, .35, 1); return; }
   if (armorOf(enemy) >= .3) { burst(PR.pingStar, p.x, p.y, p.z); burst(PR.ping, p.x, p.y, p.z); }
   else { burst(PR.hitDust, p.x, p.y, p.z); burst(PR.ping, p.x, p.y, p.z, .7, 3); }
 }
@@ -630,7 +650,7 @@ export function init() {
   })));
   ambientSetup();
 
-  bus.on('projectile:impact', d => impact(d.pos, d.projectile, d.radius, d.target));
+  bus.on('projectile:impact', d => impact(d.pos, d.projectile, d.radius, d.target, d.duration));
   bus.on('tower:fire', towerFire);
   bus.on('enemy:hit', enemyHit);
   bus.on('enemy:death', enemyDeath);

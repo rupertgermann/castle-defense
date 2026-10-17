@@ -17,6 +17,9 @@ export const mats = {
   skin: new THREE.MeshStandardMaterial({ color: '#c69474', roughness: .8 }),
   string: new THREE.MeshStandardMaterial({ color: '#d8ccaa', roughness: 1 }),
   runeGlass: new THREE.MeshStandardMaterial({ color: '#39466a', roughness: .3, emissive: '#6d8fe0', emissiveIntensity: .55 }),
+  clay: new THREE.MeshStandardMaterial({ color: '#8d5f3e', roughness: .9 }),
+  coal: new THREE.MeshStandardMaterial({ color: '#2a160c', roughness: 1, emissive: '#ff4a10', emissiveIntensity: 1.5 }),
+  pitch: new THREE.MeshStandardMaterial({ color: '#140e09', roughness: .25, emissive: '#ff6a1c', emissiveIntensity: .55 }),
   crystal: new THREE.MeshStandardMaterial({ color: '#bcd3ff', roughness: .18, metalness: .05, emissive: '#6f98ff', emissiveIntensity: 1.1, flatShading: true }),
 };
 
@@ -29,7 +32,7 @@ export const shared = {
 };
 const convert = new Map([
   ...[M.stone, M.trim, M.base].map(m => [m, shared.masonry]),
-  ...[M.timber, M.dark, mats.plank, mats.cloth, mats.clothBlue, mats.rope, mats.tunic, mats.hood, mats.leather, mats.skin, mats.string].map(m => [m, shared.plain]),
+  ...[M.timber, M.dark, mats.plank, mats.clay, mats.cloth, mats.clothBlue, mats.rope, mats.tunic, mats.hood, mats.leather, mats.skin, mats.string].map(m => [m, shared.plain]),
   ...[M.iron, mats.bronze, mats.gold].map(m => [m, shared.metal]),
 ]);
 // Merge every mesh in `group` per (shared) material into a few meshes. Returns a new Group.
@@ -503,7 +506,113 @@ function ballistaBody(level) {
   banner(g, 0, 6.8, 2.08, 1.3, 3.0, 0); banner(g, 2.08, 6.8, 0, 1.3, 3.0, Math.PI / 2); banner(g, -2.08, 6.8, 0, 1.3, 3.0, -Math.PI / 2);
   return { g, turretY: 7.58, height: 12, ballista: 1.5 };
 }
-const bodies = { archer: archerBody, cannon: cannonBody, mage: mageBody, ballista: ballistaBody };
+// ---- pitch cauldron: a torsion mangonel beside a fire-heated cauldron of pitch ----
+export const MANGONEL = { rest: -1.15, thrown: .38 };   // arm angle (rotation.x): cocked back / against the crossbar
+function mangonel(scale) {
+  const t = new THREE.Group();
+  C(t, 1.25, 1.3, .16, 0, .08, 0, mats.plank, 18);
+  for (const x of [-.58, .58]) {
+    beam([x, .14, -.95], [x, 1.62, 0], .16, M.timber, t);         // rear leg up to the axle
+    beam([x, .14, .95], [x, 3.25, .62], .16, M.timber, t);        // front post carries the stop beam
+    beam([x, .14, -.95], [x, .14, .95], .18, M.timber, t);        // sill
+    B(t, .22, .26, .22, x, 1.62, 0, M.iron);
+  }
+  B(t, 1.42, .2, .2, 0, 3.2, .62, M.timber);
+  C(t, .17, .17, 1.0, 0, 3.2, .62, mats.rope, 10).rotation.z = Math.PI / 2;  // padded stop
+  // torsion skein and its iron collars
+  C(t, .3, .3, .92, 0, 1.62, 0, mats.rope, 12).rotation.z = Math.PI / 2;
+  for (const x of [-.48, .48]) C(t, .34, .34, .08, x, 1.62, 0, M.iron, 12).rotation.z = Math.PI / 2;
+  // winch at the back
+  C(t, .06, .06, 1.2, 0, .55, -1.05, M.iron, 6).rotation.z = Math.PI / 2;
+  for (const x of [-.5, .5]) { const w = C(t, .28, .28, .08, x, .55, -1.05, M.timber, 10); w.rotation.z = Math.PI / 2; }
+  const turret = bake(t, false);
+  const armG = new THREE.Group();
+  B(armG, .2, 2.75, .2, 0, 1.08, 0, M.timber);
+  for (const y of [.5, 1.3]) B(armG, .24, .08, .24, 0, y, 0, M.iron);
+  C(armG, .34, .2, .2, 0, 2.48, 0, mats.plank, 12);              // cup
+  const arm = new THREE.Group(); arm.position.set(0, 1.62, 0); arm.add(bake(armG, false)); arm.name = 'arm';
+  const pot = mesh(new THREE.SphereGeometry(.25, 12, 8), mats.clay, arm); pot.position.y = 2.72; pot.name = 'pot'; pot.castShadow = false;
+  arm.rotation.x = MANGONEL.rest; turret.add(arm);
+  // release point: where the cup is as the arm swings through ~20° past vertical
+  const muzzle = new THREE.Object3D(); muzzle.position.set(0, 1.62 + 2.6 * Math.cos(.35), 2.6 * Math.sin(.35)); muzzle.name = 'muzzle'; turret.add(muzzle);
+  turret.scale.setScalar(scale);
+  return turret;
+}
+function cauldron(g, x, y, z, s) {
+  for (let i = 0; i < 9; i++) { const a = i * Math.PI * 2 / 9; B(g, .34 * s, .22 * s, .26 * s, x + Math.sin(a) * .78 * s, y + .11 * s, z + Math.cos(a) * .78 * s, M.trim, a); }
+  C(g, .55 * s, .65 * s, .16 * s, x, y + .08 * s, z, mats.coal, 10);
+  for (let i = 0; i < 3; i++) { const a = i * Math.PI * 2 / 3 + .4; beam([x + Math.sin(a) * .62 * s, y, z + Math.cos(a) * .62 * s], [x + Math.sin(a) * .45 * s, y + .62 * s, z + Math.cos(a) * .45 * s], .09 * s, M.iron, g); }
+  const prof = [[0, 0], [.32, .03], [.52, .16], [.62, .38], [.62, .6], [.68, .64], [.68, .72], [.6, .72]].map(([r, h]) => new THREE.Vector2(r * s, h * s));
+  mesh(new THREE.LatheGeometry(prof, 20), M.iron, g).position.set(x, y + .5 * s, z);
+  mesh(new THREE.CircleGeometry(.6 * s, 20).rotateX(-Math.PI / 2), mats.pitch, g).position.set(x, y + 1.15 * s, z);
+  for (const side of [-1, 1]) C(g, .04 * s, .04 * s, .3 * s, x + side * .7 * s, y + 1.1 * s, z, M.iron, 6).rotation.z = Math.PI / 2;  // lugs
+  return [x, y + 1.35 * s, z, s];
+}
+function potStack(g, x, y, z, n) {
+  const sg = new THREE.SphereGeometry(.25, 10, 7);
+  const spots = [[0, 0, 0], [.48, 0, .1], [.22, 0, .44], [-.24, 0, .36], [.24, .4, .2], [.6, 0, .55]];
+  for (let i = 0; i < n; i++) { const [dx, dy, dz] = spots[i]; const m = mesh(sg, mats.clay, g); m.position.set(x + dx, y + .22 + dy, z + dz); m.scale.y = .9; }
+}
+function barrels(g, x, y, z, n) {
+  for (let i = 0; i < n; i++) { const bx = x + i * .7; C(g, .3, .3, .75, bx, y + .37, z, mats.plank, 10); for (const yy of [.12, .62]) C(g, .32, .32, .06, bx, y + yy, z, M.iron, 10); C(g, .27, .27, .02, bx, y + .76, z, mats.pitch, 10); }
+}
+function cauldronBody(level) {
+  const g = new THREE.Group(), seg = 12;
+  const breastwork = (r, y, n) => {
+    for (let i = 0; i < n; i++) {
+      const a = i * Math.PI * 2 / n, b = a + Math.PI / n, w = 2 * r * Math.sin(Math.PI / n) + .05;
+      B(g, w, .5, .1, Math.sin(b) * r, y + .3, Math.cos(b) * r, mats.plank, b);
+      B(g, .16, .9, .16, Math.sin(a) * (r + .05), y + .45, Math.cos(a) * (r + .05), M.timber, a);
+      B(g, w + .05, .1, .16, Math.sin(b) * (r + .03), y + .9, Math.cos(b) * (r + .03), M.timber, b);
+    }
+  };
+  if (level === 0) {
+    C(g, 2.95, 3.25, 1.1, 0, .35, 0, M.base, seg);
+    C(g, 2.65, 2.85, 2.9, 0, 2.35, 0, M.stone, seg);
+    C(g, 3.0, 3.0, .3, 0, 3.9, 0, M.trim, seg);
+    C(g, 2.75, 2.75, .18, 0, 4.05, 0, mats.plank, seg);
+    slits(g, 2.7, 2.4, .8, .2, [0, 1, 3]); door(g, -2.78, .95, 1.6, .9);
+    breastwork(2.62, 4.1, 12);
+    const c = cauldron(g, 1.55, 4.14, -1.35, .62);
+    potStack(g, -1.55, 4.14, -1.45, 3);
+    return { g, turretY: 4.14, height: 7.5, mangonel: .95, fire: c };
+  }
+  if (level === 1) {
+    C(g, 3.1, 3.45, 1.3, 0, .4, 0, M.base, seg);
+    C(g, 2.8, 3.05, 4.4, 0, 3.1, 0, M.stone, seg);
+    C(g, 3.1, 3.1, .25, 0, 3.0, 0, M.trim, seg);
+    slits(g, 2.88, 2.1, .8, .2, [0, 1, 3]); slits(g, 2.85, 4.2, .9, .2, [1, 2, 3]); door(g, -2.98, 1.0, 1.8, 1.05);
+    corbels(g, 16, 2.95, 5.45);
+    C(g, 3.25, 3.25, .3, 0, 5.85, 0, M.trim, seg);
+    C(g, 2.85, 2.85, .2, 0, 5.95, 0, mats.plank, seg);
+    ringWall(g, 3.2, 2.75, .65, 6.0, M.stone, seg);
+    merlons(g, 9, 2.97, 7.0, .95, .7, .5, M.trim, .5);
+    const c = cauldron(g, 1.6, 6.05, -1.45, .72);
+    potStack(g, -1.65, 6.05, -1.4, 5); barrels(g, -.5, 6.05, -2.25, 2);
+    banner(g, 0, 5.0, 3.03, 1.1, 2.6, 0);
+    return { g, turretY: 6.05, height: 10, mangonel: 1.12, fire: c };
+  }
+  C(g, 3.3, 3.7, 2.0, 0, .75, 0, M.base, seg);
+  for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3 + Math.PI / 6; B(g, .95, 2.4, 1.05, Math.sin(a) * 3.3, .95, Math.cos(a) * 3.3, M.base, a); }
+  C(g, 3.4, 3.4, .28, 0, 1.85, 0, M.trim, seg);
+  C(g, 3.0, 3.2, 5.4, 0, 4.6, 0, M.stone, seg);
+  C(g, 3.25, 3.25, .25, 0, 4.4, 0, M.trim, seg);
+  slits(g, 3.08, 3.1, .9, .2, [0, 1, 3]); slits(g, 3.02, 5.9, 1.0, .22, [0, 1, 2, 3]); door(g, -3.5, 1.0, 1.4, .3);
+  corbels(g, 18, 3.1, 7.45, M.trim, 1.05);
+  C(g, 3.5, 3.5, .3, 0, 7.9, 0, M.trim, seg);
+  C(g, 3.05, 3.05, .2, 0, 8.0, 0, mats.plank, seg);
+  ringWall(g, 3.45, 2.95, .8, 8.05, M.stone, seg);
+  merlons(g, 11, 3.2, 9.25, .95, .8, .55, M.trim);
+  // smoke-blackened stair turret at the back
+  C(g, .9, .9, 3.0, 0, 9.45, -3.3, M.stone, 16); corbels(g, 6, .85, 7.7, M.trim, .7);
+  C(g, 1.0, 1.0, .2, 0, 10.95, -3.3, M.trim, 16); tiledCone(0, 11.05, -3.3, 1.35, 2.4, g);
+  const c = cauldron(g, 1.7, 8.1, -1.25, .85);
+  potStack(g, -1.75, 8.1, -1.25, 6); barrels(g, -2.1, 8.1, .9, 1); barrels(g, 1.9, 8.1, 1.1, 1);
+  pennant(g, 2.35, 8.6, -2.25, 2.8); pennant(g, -2.35, 8.6, -2.25, 2.8);
+  banner(g, 0, 6.9, 3.22, 1.3, 3.2, 0); banner(g, 3.22, 6.9, 0, 1.3, 3.2, Math.PI / 2);
+  return { g, turretY: 8.1, height: 13.5, mangonel: 1.3, fire: c };
+}
+const bodies = { archer: archerBody, cannon: cannonBody, mage: mageBody, ballista: ballistaBody, cauldron: cauldronBody };
 
 // Template: baked body + unbaked weapon template. instantiate() clones it for a tower.
 const templates = new Map();
@@ -522,6 +631,11 @@ export function instantiate(type, level, isGhost = false) {
   if (spec.archers && !isGhost) parts.archers = spec.archers.map(([x, z]) => { const f = archerFigure(); f.root.position.set(x, spec.turretY, z); f.root.scale.setScalar(1.15); root.add(f.root); poseArcher(f, 0); return f; });
   if (spec.cannon) { const t = cannon(...spec.cannon); t.position.y = spec.turretY; root.add(t); parts.turret = t; parts.pitch = t.getObjectByName('pitch'); parts.barrel = t.getObjectByName('barrel'); parts.muzzle = t.getObjectByName('muzzle'); }
   if (spec.ballista) { const t = ballista(spec.ballista); t.position.y = spec.turretY; root.add(t); parts.turret = t; parts.muzzle = t.getObjectByName('muzzle'); poseBallista(t, 1, true); }
+  if (spec.mangonel) { const t = mangonel(spec.mangonel); t.position.y = spec.turretY; root.add(t); parts.turret = t; parts.arm = t.getObjectByName('arm'); parts.pot = t.getObjectByName('pot'); parts.muzzle = t.getObjectByName('muzzle'); }
+  if (spec.fire && !isGhost) {
+    const [x, y, z, s] = spec.fire, glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: '#ff7a2a', transparent: true, opacity: .5, blending: THREE.AdditiveBlending, depthWrite: false }));
+    glow.position.set(x, y, z); glow.scale.setScalar(s * 3.4); glow.userData.size = s * 3.4; root.add(glow); parts.fire = glow;
+  }
   if (spec.crystal) { const c = crystalGroup(...spec.crystal); c.position.y = spec.turretY; root.add(c); parts.crystal = c; parts.muzzle = c; parts.crystalSize = spec.crystal[0]; }
   return parts;
 }
@@ -611,5 +725,6 @@ export function projectileGeometries() {
     new THREE.ConeGeometry(.12, .42, 6).rotateX(Math.PI / 2).translate(0, 0, 1.3),
     new THREE.BoxGeometry(.02, .26, .45).translate(0, 0, -.9), new THREE.BoxGeometry(.26, .02, .45).translate(0, 0, -.9),
   ].map(g => g.toNonIndexed()));
-  return { arrow, bolt, ball: new THREE.SphereGeometry(.3, 12, 8), orb: new THREE.PlaneGeometry(1, 1) };
+  const pot = mergeGeometries([new THREE.SphereGeometry(.28, 10, 7).scale(1, .9, 1), new THREE.CylinderGeometry(.1, .14, .16, 8).translate(0, .28, 0)].map(g => g.toNonIndexed()).map(g => { g.deleteAttribute('uv'); return g; }));
+  return { arrow, bolt, ball: new THREE.SphereGeometry(.3, 12, 8), orb: new THREE.PlaneGeometry(1, 1), pot };
 }

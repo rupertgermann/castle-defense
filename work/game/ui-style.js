@@ -151,7 +151,7 @@ position:fixed;inset:0;pointer-events:none;font-family:var(--serif);color:var(--
 #cd .card-h .nm{font-size:19px;font-weight:700;font-variant:small-caps;letter-spacing:.06em;color:var(--gold-hi);text-shadow:0 1px 0 #000;line-height:1.1}
 #cd .card-h .dt{font-size:12px;color:var(--txt2);display:flex;align-items:center;gap:5px;margin-top:2px;font-variant:small-caps;letter-spacing:.1em}
 #cd .card-h .dt .ic{font-size:13px}
-#cd .dt.pierce .ic{color:#e6d6b4}#cd .dt.blast .ic{color:#ff9d5c}#cd .dt.magic .ic{color:#c7a4ff}
+#cd .dt.pierce .ic{color:#e6d6b4}#cd .dt.blast .ic{color:#ff9d5c}#cd .dt.magic .ic{color:#c7a4ff}#cd .dt.fire .ic{color:#ff8a3a}
 #cd .card-h .x{margin-left:auto;align-self:flex-start;width:26px;height:26px;display:grid;place-items:center;border-radius:50%;color:var(--txt2)}
 #cd .card-h .x:hover{color:var(--gold-hi);background:rgba(255,255,255,.08)}
 #cd .card-b{padding:10px 14px 12px}

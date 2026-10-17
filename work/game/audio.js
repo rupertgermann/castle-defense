@@ -35,7 +35,7 @@ const MIX = {
   dum: { max: 4, gap: .02, pj: .02, bus: 'music' },
   tek: { max: 4, gap: .02, pj: .04, bus: 'music' },
 };
-const FIRE = { arrow: 'arrow', bolt: 'bolt', cannonball: 'cannon', arcane: 'arcane' };
+const FIRE = { arrow: 'arrow', bolt: 'bolt', cannonball: 'cannon', arcane: 'arcane', firepot: 'bolt' };
 
 const bank = {};              // name → AudioBuffer[]
 let bankReady = null, ctx = null, eng = null, muted = false, mode = null, paused = false;
@@ -259,9 +259,10 @@ export function init() {
   bus.on('projectile:impact', ({ pos, projectile }) => {
     const id = projId(projectile);
     if (id === 'cannonball') sfx('explosion', { pos }); else if (id === 'arcane') sfx('arcaneHit', { pos });
+    else if (id === 'firepot') sfx('explosion', { pos, rate: 1.55, gain: .5 });   // pitched-up: a whoomph, not a blast
   });
   bus.on('enemy:hit', ({ enemy, damageType, pos }) => {
-    if (damageType === 'blast' || damageType === 'magic') return;   // explosion / arcane impact already cover these
+    if (damageType === 'blast' || damageType === 'magic' || damageType === 'fire') return;   // explosion / arcane / fire impact already cover these
     sfx(armored(enemy) ? 'hitArmor' : 'hitFlesh', { pos: pos || enemy?.pos });
   });
   bus.on('enemy:death', ({ enemy, pos }) => {
@@ -293,7 +294,7 @@ export function update() {
 
 // Resume/create the AudioContext; must run inside a user gesture (ui calls it; a one-time listener is the fallback).
 export function unlock() {
-  if (!ctx) { ctx = new AudioContext({ latencyHint: 'interactive' }); eng = createEngine(ctx); }
+  if (!ctx) { ctx = new AudioContext({ latencyHint: 'interactive', sampleRate: SR }); eng = createEngine(ctx); }
   if (ctx.state !== 'running') ctx.resume();
 }
 export function setMuted(m) { muted = !!m; eng?.setVolumes(); }

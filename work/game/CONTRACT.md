@@ -43,7 +43,7 @@ gatePoint: Vector3 at the castle gate; distanceToLanes(x, z)
 ```js
 export const ENEMY_TYPES  // { [id]: { name, hp, speed (m/s), bounty (gold), damage (lives), armor (0..1 fraction of 'pierce' damage blocked), radius, height, boss?: bool } }
 export function spawnEnemy(typeId, laneIndex, { hpScale = 1 } = {}) → enemy
-export function damageEnemy(enemy, amount, { type = 'pierce' | 'blast' | 'magic', slow = null /* {factor, duration} */ } = {}) → true if this killed it
+export function damageEnemy(enemy, amount, { type = 'pierce' | 'blast' | 'magic' | 'fire', slow = null /* {factor, duration} */ } = {}) → true if this killed it
 export function enemiesInRadius(pos, radius) → enemy[]
 ```
 Enemy object: `{ id, typeId, hp, maxHp, alive, lane, dist, pos /*Vector3 feet*/, velocity /*Vector3 m/s*/, radius, height, bounty, slowFactor }`. Aim point = `pos.y + height * .6`.
@@ -64,7 +64,8 @@ export function pick(raycaster) → { kind: 'pad', pad } | { kind: 'tower', towe
 export function setHighlight(selection /* same shape as pick() */, previewTypeId?)  // range ring, hover/selected glow, ghost preview
 ```
 Tower object: `{ id, typeId, level /*0..2*/, pad, pos, range, target, kills, spent }`, stored in `state.towers`.
-Towers own projectile flight and call `damageEnemy`. Emit `'tower:fire' {tower, from: Vector3, target, projectile}` and `'projectile:impact' {pos, projectile, radius, target}`. Projectile ids: `'arrow' | 'cannonball' | 'arcane' | 'bolt'` (towers agent may add more; document them in your report).
+Towers own projectile flight and call `damageEnemy`. Emit `'tower:fire' {tower, from: Vector3, target, projectile}` and `'projectile:impact' {pos, projectile, radius, target}`. Projectile ids: `'arrow' | 'cannonball' | 'arcane' | 'bolt' | 'firepot'` (towers agent may add more; document them in your report).
+`'firepot'` (Pitch Cauldron) impacts carry `duration`: the pool burns for that long and towers deal `'fire'` damage (ignores armour) to foes inside, in 0.25 s ticks. FX draws the flames, towers draw the ground glow.
 
 ## fx.js / audio.js
 
