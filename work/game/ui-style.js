@@ -113,7 +113,7 @@ position:fixed;inset:0;pointer-events:none;font-family:var(--serif);color:var(--
 #cd .banner.show{animation:cdBanner 3.2s cubic-bezier(.2,.8,.2,1) forwards}
 #cd .banner .k{font-size:15px;letter-spacing:.4em;font-variant:small-caps;color:#f3dfb0;text-shadow:0 2px 6px #000}
 #cd .banner .t{font-size:clamp(30px,4.4vw,54px);font-weight:700;font-variant:small-caps;letter-spacing:.06em;background:linear-gradient(#fff8dc,#f2cb6b 50%,#a8741d);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 2px 0 #3a2305) drop-shadow(0 6px 14px rgba(0,0,0,.7))}
-#cd .banner.bad .t{background:linear-gradient(#fff0e6,#ff9d7c 45%,#a8251a)}
+#cd .banner.bad .t{background-image:linear-gradient(#fff0e6,#ff9d7c 45%,#a8251a)}
 #cd .banner .fl{width:240px;height:24px;color:#e7bd5a;margin:6px auto 0;display:block;filter:drop-shadow(0 1px 2px #000)}
 #cd .banner .s{font-size:17px;color:#fff1cf;font-style:italic;text-shadow:0 2px 6px #000,0 0 2px #000;margin-top:4px;display:flex;justify-content:center;align-items:center;gap:6px}
 @keyframes cdBanner{0%{opacity:0;transform:translate(-50%,-30%) scale(.94);letter-spacing:.3em}12%{opacity:1;transform:translate(-50%,-50%) scale(1)}80%{opacity:1;transform:translate(-50%,-50%)}100%{opacity:0;transform:translate(-50%,-62%)}}
@@ -184,7 +184,7 @@ position:fixed;inset:0;pointer-events:none;font-family:var(--serif);color:var(--
 
 /* Paused */
 #cd .paused{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:14px 34px;font-size:30px;font-weight:700;font-variant:small-caps;letter-spacing:.3em;color:var(--gold-hi);display:none;text-shadow:0 2px 0 #000}
-#cd .paused{text-align:center;padding:16px 26px 18px}
+#cd .paused{text-align:center;padding:16px 26px 18px;width:max-content}
 #cd .pbtn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:8px;padding:9px 18px;border-radius:7px;font-size:16px;letter-spacing:.08em;color:var(--txt);background:rgba(0,0,0,.28);box-shadow:inset 0 0 0 1px rgba(231,189,90,.35);text-shadow:none}
 #cd .pbtn:first-of-type{margin-top:12px;color:var(--gold-hi);box-shadow:inset 0 0 0 1px rgba(231,189,90,.8)}
 #cd .pbtn:hover{background:rgba(231,189,90,.16)}

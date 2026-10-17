@@ -138,7 +138,7 @@ function waveClear() {
 
 function endGame(won) {
   state.phase = won ? 'won' : 'lost';
-  deselect();
+  deselect(); flyTo('title');   // the fireworks (or the flames) play out over the keep
   bus.emit(won ? 'game:won' : 'game:lost');
   setTimeout(() => showEnd(won), won ? 1400 : 900);
 }
@@ -355,7 +355,7 @@ function placeAnchored() {
   let sx = (proj.x + 1) / 2 * W, sy = (1 - proj.y) / 2 * H;
   const bmOn = $.bm.classList.contains('open');
   if (bmOn) {
-    const topLimit = $.top.offsetTop + $.top.offsetHeight + 90, botLimit = H - (compact && cardEl ? cardEl.offsetHeight + 110 : 90);
+    const topLimit = $.top.offsetTop + $.top.offsetHeight + 90, botLimit = H - (compact && cardEl ? cardEl.offsetHeight + 130 : 90);
     const bx = THREE.MathUtils.clamp(sx, 90, W - 90), by = THREE.MathUtils.clamp(sy, topLimit, Math.max(topLimit, botLimit));
     $.bm.style.transform = `translate(${bx}px,${by}px)`; $.bm.style.visibility = visible ? '' : 'hidden';
     sx = bx; sy = by;
@@ -426,12 +426,13 @@ function refreshHud(realDt) {
   const hint = sel?.kind === 'pad' ? k('Hover a tower to preview its reach. Click or press <kbd>1</kbd>–<kbd>5</kbd> to build.', 'Tap a tower to preview it, tap Build to raise it.')
     : sel?.kind === 'tower' && sellArmed ? k('Press <kbd>S</kbd> again to sell, <kbd>Esc</kbd> to keep the tower.', 'Tap Confirm to sell this tower.')
     : sel?.kind === 'tower' ? k('<kbd>U</kbd> upgrade · <kbd>S</kbd> sell · <kbd>Esc</kbd> close', 'Upgrade or sell this tower. Tap the ground to close.')
+    : !touch && hover?.kind === 'pad' ? 'Click to choose a tower, or press <kbd>1</kbd>–<kbd>5</kbd> to build one here.'
     : fighting ? k('Click a tower to upgrade it mid-battle. <kbd>F</kbd> hastens the fight, <kbd>P</kbd> pauses.', 'Tap a tower to upgrade it mid-battle.')
     : countdown != null ? 'Sound the horn early — every second saved is gold for the treasury.'
     : state.towers.length === 0 ? k('Click a stone build site beside the road to raise your first tower.', 'Tap a stone build site beside the road to raise your first tower.')
     : k('When your defences are ready, sound the horn or press <kbd>Space</kbd>.', 'When your defences are ready, sound the horn.');
   // By wave 4 the commander knows the drill: keep only the hints tied to a selection.
-  const shown = sel || state.wave < 4 ? hint : '';
+  const shown = sel || hover?.kind === 'pad' || state.wave < 4 ? hint : '';
   if (shown !== hintKey) { hintKey = shown; $.hint.innerHTML = shown && `${icon('crown')}<span>${shown}</span>`; if (shown) flash($.hint, 'swap'); }
 }
 
@@ -543,13 +544,20 @@ addEventListener('keydown', e => {
   else if (key === 'escape') { if (state.selected) deselect(); else toggle('pause'); }
   else if (key === 'u') upgrade();
   else if (key === 's') sell();
-  else if (key >= '1' && key <= '9' && state.selected?.kind === 'pad' && Object.keys(TT())[key - 1]) build(Object.keys(TT())[key - 1]);
+  else if (key >= '1' && key <= '9' && Object.keys(TT())[key - 1]) {
+    // Build on the selected site, or straight onto the hovered one without opening its menu.
+    const id = Object.keys(TT())[key - 1];
+    if (state.selected?.kind === 'pad') build(id);
+    else if (!state.selected && hover?.kind === 'pad') { state.selected = hover; build(id); if (state.selected) deselect(); }
+  }
   else if (key === 'home' || key === 'o') flyTo('overview');
 });
 
 // ── Module API ──
 export function init() {
   setupCamera(); setupPointer(); showMute();
+  // Leaving the tab mid-siege: come back to the pause menu rather than straight into the fight.
+  document.addEventListener('visibilitychange', () => { if (document.hidden && !state.paused) toggle('pause'); });
   bus.on('enemy:death', ({ enemy }) => { stats.slain++; stats.earned += enemy?.bounty || 0; });
   bus.on('tower:build', () => { stats.built++; });
   bus.on('enemy:leak', ({ enemy }) => { stats.leaks[enemy.lane]++; });
