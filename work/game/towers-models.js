@@ -617,7 +617,7 @@ function cauldronBody(level) {
 }
 // ---- trebuchet: a counterweight engine on a stone bastion. The arm pivots on the axle; the counterweight hangs
 // from a hinge on the short end and is kept plumb each frame; the boulder rides in the sling at the long end. ----
-export const TREBUCHET = { rest: -2.35, thrown: .6, pivot: 4.6, long: 5.2, short: 1.5 };
+export const TREBUCHET = { rest: -2.45, thrown: .6, pivot: 4.2, long: 4.6, short: 1.4 };
 let boulderGeo;
 export function boulderGeometry() {
   if (boulderGeo) return boulderGeo;

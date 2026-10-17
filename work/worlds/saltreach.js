@@ -151,23 +151,23 @@ export function buildSaltreach(K) {
   // ---- the sea: reflective water, plus a shallows layer that tints the shelf and draws surf lines along every shore ----
   // Tileable fractal value noise (lattice wraps at the tile edge), turned into normals by finite differences:
   // organic ripples with no grid or moiré.
-  const lattice = Array.from({ length: 3 }, (_, o) => { const n = 8 << o; return { n, v: Float32Array.from({ length: n * n }, rand) }; });
+  const lattice = Array.from({ length: 4 }, (_, o) => { const n = 8 << o; return { n, v: Float32Array.from({ length: n * n }, rand) }; });
   const vnoise = (L, u, v) => {
     const x = u * L.n, y = v * L.n, xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi, sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
     const at = (i, j) => L.v[((j % L.n + L.n) % L.n) * L.n + ((i % L.n + L.n) % L.n)];
     return (at(xi, yi) * (1 - sx) + at(xi + 1, yi) * sx) * (1 - sy) + (at(xi, yi + 1) * (1 - sx) + at(xi + 1, yi + 1) * sx) * sy;
   };
-  const wh = (u, v) => vnoise(lattice[0], u, v) * .55 + vnoise(lattice[1], u + .37, v + .11) * .3 + vnoise(lattice[2], u + .71, v + .53) * .15;
+  const wh = (u, v) => vnoise(lattice[0], u, v) * .4 + vnoise(lattice[1], u + .37, v + .11) * .3 + vnoise(lattice[2], u + .71, v + .53) * .2 + vnoise(lattice[3], u + .19, v + .83) * .1;
   const waterNormals = canvasTexture(256, (c, s) => {
     const p = c.createImageData(s, s), e = 1 / s;
     for (let y = 0; y < s; y++) for (let x = 0; x < s; x++) {
-      const u = x / s, v = y / s, dx = (wh(u + e, v) - wh(u - e, v)) * 16, dy = (wh(u, v + e) - wh(u, v - e)) * 16;
+      const u = x / s, v = y / s, dx = (wh(u + e, v) - wh(u - e, v)) * 9, dy = (wh(u, v + e) - wh(u, v - e)) * 9;
       const i = (y * s + x) * 4; p.data[i] = 128 + THREE.MathUtils.clamp(dx * 127, -120, 120); p.data[i + 1] = 128 + THREE.MathUtils.clamp(dy * 127, -120, 120); p.data[i + 2] = 255; p.data[i + 3] = 255;
     }
     c.putImageData(p, 0, 0);
   }, false);
   waterNormals.repeat.set(140, 140);
-  const water = new Water(new THREE.PlaneGeometry(2600, 2600, 1, 1), { textureWidth: 768, textureHeight: 768, waterNormals, sunDirection: sunDir.clone(), sunColor: '#ffb27a', waterColor: '#1c4a58', distortionScale: .9, fog: true });
+  const water = new Water(new THREE.PlaneGeometry(2600, 2600, 1, 1), { textureWidth: 768, textureHeight: 768, waterNormals, sunDirection: sunDir.clone(), sunColor: '#a8703f', waterColor: '#1c4a58', distortionScale: .9, fog: true });
   water.material.fragmentShader = water.material.fragmentShader.replace('float rf0 = 0.3;', 'float rf0 = 0.045;');
   water.rotation.x = -Math.PI / 2; water.position.y = SEA; water.castShadow = false; water.material.uniforms.size.value = 3.2; scene.add(water);
   // Height field of the shelf (≈1.75 m per texel) for the shallows shader.
@@ -191,10 +191,11 @@ export function buildSaltreach(K) {
         vec3 col=mix(vec3(.12,.4,.44),vec3(.3,.62,.6),1.-smoothstep(0.,2.5,depth));
         float a=shelf*.34;
         // surf: bands rolling shoreward, broken up by noise; a bright wash right at the waterline
-        float wave=sin(depth*3.1+time*1.6+n*6.)*.5+.5; wave=smoothstep(.82,.98,wave)*(1.-smoothstep(.3,3.2,depth))*smoothstep(.35,.65,n+.25*sin(vW.x*.07+time*.3));
-        float wash=(1.-smoothstep(0.,.45,depth+.08*sin(time*1.1+vW.x*.15+vW.z*.11)))*(.55+.45*sin(time*.9+n*9.));
+        float brk=smoothstep(.35,.7,n+.3*sin(vW.x*.21+vW.z*.17+time*.4)+.2*sin(vW.x*.53-vW.z*.47));   // breaks the foam into patches
+        float wave=sin(depth*3.1+time*1.6+n*6.)*.5+.5; wave=smoothstep(.9,.99,wave)*(1.-smoothstep(.2,1.8,depth))*brk*.7;
+        float wash=(1.-smoothstep(0.,.18,abs(depth-.05-.06*sin(time*1.1+vW.x*.15+vW.z*.11))))*(.4+.6*brk)*.8;
         float foam=clamp(wave+wash,0.,1.);
-        foam*=edge; col=mix(col,vec3(1.,.97,.92),foam); a=max(a,foam*.92);
+        foam*=edge; col=mix(col,vec3(1.,.97,.92),foam); a=max(a,foam*.75);
         gl_FragColor=vec4(col,a);
         #include <fog_fragment>
       }`.replace(/#include <(\w+)>/g, '\n#include <$1>\n'),
@@ -236,7 +237,8 @@ export function buildSaltreach(K) {
   for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; beam([BX + Math.cos(a) * 1.3, bY + 26.8, BZ + Math.sin(a) * 1.3], [BX + Math.cos(a) * 2.1, bY + 28.1, BZ + Math.sin(a) * 2.1], .12, materials.iron); }
   const flameMat = new THREE.MeshBasicMaterial({ color: '#ff9a3c', transparent: true, opacity: .85, blending: THREE.AdditiveBlending, depthWrite: false });
   const beaconCore = new THREE.Group(); beaconCore.position.set(BX, bY + 27.9, BZ); scene.add(beaconCore);
-  for (let i = 0; i < 7; i++) { const f = new THREE.Mesh(new THREE.ConeGeometry(between(.4, .75), between(1.6, 3), 7, 1, true).translate(0, 1, 0), flameMat); const a = i / 7 * 6.28; f.position.set(Math.cos(a) * between(.2, .9), 0, Math.sin(a) * between(.2, .9)); f.userData.k = rand() * 6; beaconCore.add(f); }
+  const coreMat = new THREE.MeshBasicMaterial({ color: '#ffd27a', transparent: true, opacity: .9, blending: THREE.AdditiveBlending, depthWrite: false });
+  for (let i = 0; i < 12; i++) { const f = new THREE.Mesh(new THREE.ConeGeometry(between(.25, .6), between(1.2, 3.2), 7, 1, true).translate(0, 1, 0), i < 4 ? coreMat : flameMat); const a = i / 7 * 6.28; f.position.set(Math.cos(a) * between(.2, .9), 0, Math.sin(a) * between(.2, .9)); f.userData.k = rand() * 6; beaconCore.add(f); }
   const glowTex = canvasTexture(64, (c, s) => { const g = c.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2); g.addColorStop(0, 'rgba(255,220,160,1)'); g.addColorStop(.25, 'rgba(255,150,60,.55)'); g.addColorStop(1, 'rgba(255,120,40,0)'); c.fillStyle = g; c.fillRect(0, 0, s, s); });
   const beaconGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: '#ffffff', transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
   beaconGlow.scale.setScalar(16); beaconGlow.position.copy(beaconCore.position); scene.add(beaconGlow);
@@ -311,14 +313,28 @@ export function buildSaltreach(K) {
   for (let i = 0; i < rp.count; i++) { const f = .78 + noise(rp.getX(i) * 2.6 + 5, rp.getZ(i) * 2.6 + rp.getY(i) * 1.7) * .44; rp.setXYZ(i, rp.getX(i) * f, rp.getY(i) * f, rp.getZ(i) * f); }
   rockGeometry.computeVertexNormals();
   const rockMat = new THREE.MeshStandardMaterial({ color: '#8b8070', roughness: 1 });
+  // Sea stacks: tapering columns with stepped strata, cracks and a dark wet foot (vertex colours).
+  function stackGeometry(seed) {
+    const g = new THREE.CylinderGeometry(4.2, 6, 30, 14, 24).translate(0, 15, 0), p = g.attributes.position, col = [], c = new THREE.Color();
+    for (let i = 0; i < p.count; i++) {
+      const x = p.getX(i), y = p.getY(i), z = p.getZ(i), a = Math.atan2(z, x), band = Math.floor(y / 2.4);
+      const f = .78 + .3 * noise(Math.cos(a) * 2 + seed, Math.sin(a) * 2 + band * .7) + .08 * (band % 2) - .25 * Math.max(0, (y - 24) / 6) ** 2;
+      p.setXYZ(i, x * f, y, z * f);
+      c.setHSL(.07 + .02 * noise(band * .9, seed), .1, (.24 + .12 * noise(a * 3 + seed, y * .3)) * (y < 3.4 ? .5 : 1));
+      col.push(c.r, c.g, c.b);
+    }
+    g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.computeVertexNormals(); return g;
+  }
+  const stackGeo = [stackGeometry(1), stackGeometry(5)], stackMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 });
+  let stackN = 0;
   for (const [x, z, s, h] of [[-96, 6, 7, 26], [-118, -70, 9, 34], [-86, -112, 6, 20], [-104, 60, 5, 16], [-130, 120, 8, 22], [-30, 214, 5, 12]]) {
-    for (let k = 0; k < 4; k++) instance(rockGeometry, rockMat, x + between(-1.2, 1.2), -2 + h * (.2 + k * .24), z + between(-1.2, 1.2), s * (1 - k * .14), h * .3, s * (.85 - k * .12), rand() * 6, new THREE.Color().setHSL(.08, .1, between(.78, 1)));
+    instance(stackGeo[stackN++ % 2], stackMat, x, -3, z, s / 6, h / 26, s / 6, rand() * 6);
     instance(rockGeometry, rockMat, x, SEA - .2, z, s * 1.12, 1.6, s * .98, rand() * 6, new THREE.Color('#3a332c'));
   }
-  for (let i = 0; i < 520; i++) {
-    const z = between(-220, 120), x = westCoast(z) + between(-7, 3), s = between(.6, 3.2);
+  for (let i = 0; i < 260; i++) {
+    const z = between(-220, 120), x = westCoast(z) + between(-7, 1), s = between(.6, 2.6);
     if (beachness(x, z) > .4) continue;
-    instance(rockGeometry, rockMat, x, height(x, z) - s * .3, z, s * between(1, 1.7), s * .7, s, rand() * 6, new THREE.Color().setHSL(.08, .08, between(.6, 1)));
+    instance(rockGeometry, rockMat, x, height(x, z) - s * .45, z, s * between(1, 1.7), s * .7, s, rand() * 6, new THREE.Color().setHSL(.08, .08, between(.6, 1)));
   }
   for (let i = 0; i < 140; i++) {
     const x = between(-140, 160), z = between(130, 330);
@@ -329,7 +345,7 @@ export function buildSaltreach(K) {
   // ---- a fishing hamlet on the slope above the beach, nets drying on racks ----
   for (const c of cottages) cottage(...c);
   const chimneys = cottages.map(([x, z, w, d, h, r]) => { const lx = -w * .23, lz = -d * .2, c = Math.cos(r), s = Math.sin(r); return [x + lx * c + lz * s, height(x, z) - .25 + h + 3.55, z - lx * s + lz * c, 1.6 + rand()]; });
-  chimneys.push([BX, bY + 30, BZ, 1.4], [18, BASE + 8.5 + 6.6, -8, 1.1], [-19, BASE + 8 + 6.4, 0, .9], [-.4, BASE + 29, -14.5, .9]);
+  chimneys.push([BX, bY + 30, BZ, 3], [18, BASE + 8.5 + 6.6, -8, 1.1], [-19, BASE + 8 + 6.4, 0, .9], [-.4, BASE + 29, -14.5, .9]);
   const netMat = new THREE.MeshStandardMaterial({ color: '#5b4a35', roughness: 1, transparent: true, opacity: .75, side: THREE.DoubleSide });
   for (const [x, z, r] of [[-28, 108, .5], [-56, 100, .9], [-6, 134, -.2]]) {
     const y = height(x, z);
@@ -391,8 +407,8 @@ export function buildSaltreach(K) {
     if (r < 52 || y < SEA + 3.5 || landD(x, z) < 14 || roadD(x, z) < 9 || nearPad(x, z, 13)) continue;
     const near = r < 170 || Math.hypot(x - 80, z - 266) < 70;
     if (near && noise(x * .03 + 3, z * .03) < .58) continue;
-    if (!near && (noise(x * .02, z * .02 + 6) < .42 || noise(x * .055 + 3, z * .055) < .3)) continue;   // stands with clearings, not a carpet
-    const s = between(.8, 1.25), t = near ? pines[i % 3] : farPines[i % 2];
+    if (!near && (noise(x * .02, z * .02 + 6) < .46 || noise(x * .055 + 3, z * .055) < .38)) continue;   // stands with clearings, not a carpet
+    const s = between(.65, 1.4), t = near ? pines[i % 3] : farPines[i % 2];
     const rot = between(-.25, .25), tint = new THREE.Color().setHSL(between(.16, .3), between(.12, .32), between(.72, 1.12));
     treeLocations.push([x, z, s, instance(t.bark, barkMaterial, x, y - .3, z, s, s, s, rot), instance(t.foliage, leafMaterial, x, y - .3, z, s, s * between(.85, 1.15), s, rot, tint)]);
   }
@@ -410,12 +426,12 @@ export function buildSaltreach(K) {
   const grassPos = [], grassCol = [], gc = new THREE.Color();
   for (let i = 0; i < 120000; i++) {
     const x = between(-120, 240), z = between(-140, 360), y = height(x, z);
-    if (y < SEA + 1.1 || roadD(x, z) < 3.6 || Math.hypot(x, z) < 36) continue;
+    if (y < SEA + 2.2 || roadD(x, z) < 3.6 || Math.hypot(x, z) < 36) continue;
     const dune = 1 - smooth(SEA + 3, SEA + 8, y);
-    if (rand() < .35 - dune * .3) continue;
+    if (noise(x * .45 + 7, z * .45) < .45 + dune * .2) continue;   // grows in tufts, sparse on the dunes
     const size = between(.25, .7) * (1 + dune * .6), a = rand() * 6.28, dx = Math.cos(a) * .09, dz = Math.sin(a) * .09, lean = between(.05, .3);   // leaning east, off the sea
     grassPos.push(x - dx, y, z - dz, x + dx, y, z + dz, x + lean, y + size, z + lean * .3);
-    gc.setHSL(dune > .5 ? between(.12, .15) : between(.13, .21), dune > .5 ? between(.14, .26) : between(.3, .45), dune > .5 ? between(.5, .62) : between(.22, .36));
+    gc.setHSL(dune > .5 ? between(.12, .15) : between(.15, .22), dune > .5 ? between(.18, .28) : between(.28, .42), dune > .5 ? between(.36, .46) : between(.17, .28));
     for (let j = 0; j < 3; j++) grassCol.push(gc.r, gc.g, gc.b);
   }
   const grassG = new THREE.BufferGeometry(); grassG.setAttribute('position', new THREE.Float32BufferAttribute(grassPos, 3)); grassG.setAttribute('color', new THREE.Float32BufferAttribute(grassCol, 3)); grassG.computeVertexNormals();
@@ -442,7 +458,7 @@ export function buildSaltreach(K) {
   function camp(cx, cz, n, spread) {
     for (let k = 0; k < n; k++) {
       const a = k / n * Math.PI * 2 + rand(), rr = between(spread * .45, spread), x = cx + Math.cos(a) * rr, z = cz + Math.sin(a) * rr;
-      if (roadD(x, z) < 6) continue;
+      if (roadD(x, z) < 6 || nearPad(x, z, 7.5)) continue;
       const s = between(2.4, 3.4); instance(tentG, tentMat, x, height(x, z) - .1, z, s, s * between(1.1, 1.4), s, rand() * 6);
       cylinder(.06, .08, .9, x, height(x, z) + s * 1.3, z, materials.timber, 5);
     }
@@ -452,9 +468,8 @@ export function buildSaltreach(K) {
       for (let q = 0; q < 7; q++) { const a = q / 7 * 6.28; instance(rockGeometry, rockMat, x + Math.cos(a) * 1.1, y + .1, z + Math.sin(a) * 1.1, .3, .25, .3, a); }
     }
     flag(cx + 2, height(cx + 2, cz) - .2, cz - 3, 1.1);
-    const pr = spread + 4;
-    for (let a = 0; a < Math.PI * 2; a += .09) {
-      const x = cx + Math.cos(a) * pr, z = cz + Math.sin(a) * pr;
+    for (let a = 0; a < Math.PI * 2; a += .06) {
+      const pr = spread + 4 + 3 * (noise(Math.cos(a) * 1.5 + cx, Math.sin(a) * 1.5) - .5), x = cx + Math.cos(a) * pr, z = cz + Math.sin(a) * pr;
       if (roadD(x, z) < 6 || height(x, z) < SEA + .6) continue;
       instance(stakeG, stakeMat, x, height(x, z) - .2, z, 1, between(.8, 1.2), 1, a, null, Math.cos(a) * .25, -Math.sin(a) * .25);
     }

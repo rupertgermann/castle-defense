@@ -399,7 +399,7 @@ function crush(p, radius = 4.6) {
   burst(PR.groundDust, p.x, g + .4, p.z, s * 1.5); burst(PR.groundDust, p.x, g + 1.2, p.z, s);
   burst(PR.bigSmoke, p.x, g + .8, p.z, s * .7);
   burst(PR.clods, p.x, g + .3, p.z, s * 1.4);
-  debris(p.x, g + .4, p.z, 18, 13 * Math.sqrt(s), [DEBRIS.dirt, DEBRIS.stone, DEBRIS.stone], .2 * s, .5 * s, 6);
+  debris(p.x, g + .4, p.z, 12, 11 * Math.sqrt(s), [DEBRIS.dirt, DEBRIS.stone, DEBRIS.stone], .07 * s, .17 * s, 5);
   decal(1, p.x, g, p.z, radius * 1.6, .9, .7, RING, .35);
   decal(0, p.x, g, p.z, radius * .75, 18, .85, SCORCH, 0, 1);
   shakeAt(p, .55 * s);
@@ -408,7 +408,7 @@ function crush(p, radius = 4.6) {
 const HEAL = col('#7dffa8', 2.6), HEAL2 = col('#2fb86a', 1.2), HEAL_RING = col('#7dffa8', 1.8);
 function healPulse({ pos, radius, targets }) {
   const g = groundAt(pos.x, pos.z);
-  decal(1, pos.x, g, pos.z, radius, .6, .35, HEAL_RING, 1);
+  decal(1, pos.x, g, pos.z, 2.6, .55, .45, HEAL_RING, 1);   // a small ring at the priest; the motes show who was mended
   burst(PR.motes, pos.x, g + 1.8, pos.z, 1, 10, 0, 1, 0, HEAL, HEAL2);
   for (const e of targets || []) burst(PR.motes, e.pos.x, e.pos.y + (e.height || 1.8) * .5, e.pos.z, .8, 5, 0, 1, 0, HEAL, HEAL2);
 }
