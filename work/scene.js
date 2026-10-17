@@ -253,6 +253,7 @@ function pitchedRoof(w, d, h, x, y, z, parent = scene) {
 const kit = { THREE, scene, renderer, rand, between, clamp, smooth, hash, noise, fbm, canvasTexture, stoneMaps, materials, instance, unitBox, worldUV, mesh, box, cylinder, beam, archPath, facade, tiledCone, pitchedRoof, mergeGeometries, Water };
 const world = ({ frostmere: buildFrostmere, saltreach: buildSaltreach }[LEVEL] || buildCastle)(kit);
 const { height, BASE, gateCenter, sun, terrain, water, treeLocations, bridgeDeck, lanePaths, laneNames, padSpots, titleView, fortPoints } = world;
+if (world.exposure) renderer.toneMappingExposure = world.exposure;
 const initialPosition = world.view.position.clone();
 camera.position.copy(initialPosition); controls.target.copy(world.view.target); controls.update();
 

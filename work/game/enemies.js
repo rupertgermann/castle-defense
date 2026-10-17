@@ -15,8 +15,8 @@ export const ENEMY_TYPES = {
   shaman: { name: 'War Shaman', tip: 'Mends the wounded around it. Kill it first.', hp: 200, speed: 2.4, bounty: 22, damage: 1, armor: 0, radius: .6, height: 2.9, heal: { every: 3.2, radius: 8, frac: .12, boss: 120 } },
   outrider: { name: 'Outrider', tip: 'Armoured lancers that ride twice as fast as men on foot.', hp: 200, speed: 4.8, bounty: 26, damage: 1, armor: .35, radius: 1.0, height: 3.6 },
 };
-// Models are authored at true scale (man ≈ 1.85 m) and drawn 1.3× for readability from the aerial camera.
-const SCALE = 1.3;
+// Models are authored at true scale (man ≈ 1.85 m) and drawn 1.6× for readability from the aerial camera.
+const SCALE = 1.6, SEP = SCALE / 1.3;   // crowd spacing follows the drawn size
 // Internal per-type data: stride (m per gait cycle), lateral spread, shadow footprint, size variation.
 const KIND = {
   raider: { w: .45, l: .45, stride: 1.7, lat: 1.5, shadow: [.75, .75], vary: .05 },
@@ -110,8 +110,8 @@ function makeBars() {
     vertexShader: `attribute vec4 bar; uniform float uScale, uPR; varying vec4 vBar; varying float vPx;
       void main(){ vBar = bar; vec4 mv = modelViewMatrix * vec4(position, 1.); gl_Position = projectionMatrix * mv;
         float boss = step(.5, bar.w);
-        float px = mix(1.5, 4.0, boss) * projectionMatrix[1][1] * uScale / -mv.z;
-        px = clamp(px, mix(24., 72., boss) * uPR, mix(64., 170., boss) * uPR);
+        float px = mix(1.2, 4.0, boss) * projectionMatrix[1][1] * uScale / -mv.z;
+        px = clamp(px, mix(18., 72., boss) * uPR, mix(52., 170., boss) * uPR);
         gl_PointSize = px; vPx = px; }`,
     fragmentShader: `uniform float uPR; varying vec4 vBar; varying float vPx;
       void main(){
@@ -148,7 +148,7 @@ function makeShadows() {
     vertexShader: `attribute float alpha; varying float vA; varying vec2 vUv;
       void main(){ vUv = uv; vA = alpha; gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.); }`,
     fragmentShader: `varying float vA; varying vec2 vUv;
-      void main(){ float r = length(vUv - .5) * 2.; float a = smoothstep(1., .15, r); gl_FragColor = vec4(.03, .028, .02, a * a * vA * .62); }`,
+      void main(){ float r = length(vUv - .5) * 2.; float a = smoothstep(1., .15, r); gl_FragColor = vec4(mix(vec3(.22, .02, .01), vec3(.03, .028, .02), smoothstep(.55, .85, r)), a * a * vA * .7); }   // a crimson heart under each foe keeps the host readable from the overview`,
   });
   const mesh = new THREE.InstancedMesh(geo, mat, cap);
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -275,9 +275,9 @@ function separate(dt) {
     for (let j = i + 1; j < list.length; j++) {
       const b = list[j], kb = KIND[b.typeId];
       if (a.lane !== b.lane) continue;
-      const needD = (ka.l + kb.l) * .9, dd = Math.abs(a.dist - b.dist);
+      const needD = (ka.l + kb.l) * .9 * SEP, dd = Math.abs(a.dist - b.dist);
       if (dd > needD) continue;
-      const needL = (ka.w + kb.w) * .95, dl = a.lat - b.lat, gap = Math.abs(dl);
+      const needL = (ka.w + kb.w) * .95 * SEP, dl = a.lat - b.lat, gap = Math.abs(dl);
       if (gap >= needL) continue;
       const push = (needL - gap) * Math.min(1, dt * 4) * (1 - dd / needD * .5), s = dl === 0 ? (a.id < b.id ? 1 : -1) : Math.sign(dl);
       const wa = kb.w / (ka.w + kb.w);
@@ -496,7 +496,7 @@ function draw(e) {
   // health bar
   if (e.alive && e.barA > 0 && bars.n < bars.cap) {
     const i = bars.n++, pa = bars.geometry.attributes.position.array, ba = bars.geometry.attributes.bar.array;
-    pa[i * 3] = e.pos.x; pa[i * 3 + 1] = e.pos.y + (type.boss ? 7.6 : type.height * e.scale + .4); pa[i * 3 + 2] = e.pos.z;
+    pa[i * 3] = e.pos.x; pa[i * 3 + 1] = e.pos.y + (type.boss ? 7.6 * SEP : type.height * e.scale * SEP + .4); pa[i * 3 + 2] = e.pos.z;
     ba[i * 4] = Math.max(0, e.hp / e.maxHp); ba[i * 4 + 1] = e.trail; ba[i * 4 + 2] = e.barA * (1 - fade); ba[i * 4 + 3] = type.boss ? 1 : 0;
   }
 }

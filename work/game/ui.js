@@ -50,6 +50,7 @@ root.innerHTML = `<style>${CSS}</style>${SPRITE}
 </div>
 <div class="hint parch" data-r="hint" aria-live="polite"></div>
 <div class="banner" data-r="banner" aria-live="polite"></div>
+<div class="breach" data-r="breach"></div>
 <div data-r="pins">${lanes.map((_, i) => `<div class="pin" hidden><b></b><span>${laneNames[i]}</span></div>`).join('')}</div>
 <div class="bm" data-r="bm"></div>
 <div data-r="cards"></div>
@@ -63,7 +64,7 @@ root.innerHTML = `<style>${CSS}</style>${SPRITE}
   <div class="gsub">${levelInfo.tagline}</div>
   ${fl}
   <div class="maps" role="radiogroup" aria-label="Battlefield">${Object.entries(LEVELS).map(([k, l]) => `
-    <button class="mapbtn leather ${k === LEVEL ? 'sel' : ''}" data-a="level" data-k="${k}" role="radio" aria-checked="${k === LEVEL}">${icon({ castle: 'tower', frostmere: 'peak', saltreach: 'lighthouse' }[k])}<span><b>${l.name}</b><small>${l.place}</small></span></button>`).join('')}</div>
+    <button class="mapbtn leather ${k === LEVEL ? 'sel' : ''}" data-a="level" data-k="${k}" role="radio" aria-checked="${k === LEVEL}">${icon({ castle: 'tower', frostmere: 'peak', saltreach: 'lighthouse' }[k])}<span><b>${l.name}</b><small>${l.place}</small></span><span class="best"></span></button>`).join('')}</div>
   <div class="diff" role="radiogroup" aria-label="Difficulty">${Object.entries(DIFFS).map(([k, d]) => `
     <button class="dcard leather" data-a="diff" data-k="${k}" role="radio" aria-label="${d.name}: ${d.desc} ${d.lives} keep strength, ${Math.round(BASE_GOLD * d.gold)} starting gold, foes at ${Math.round(d.hp * 100)}% toughness">${icon(d.icon)}<h3>${d.name}</h3><p>${d.desc}</p>
     <div class="m"><span title="Keep strength">${icon('heart')}${d.lives}</span><span title="Starting gold">${icon('coin')}${Math.round(BASE_GOLD * d.gold)}</span><span title="Foe toughness">${icon('skull')}${Math.round(d.hp * 100)}%</span></div></button>`).join('')}</div>
@@ -82,6 +83,7 @@ let hover = null, hoverXY = null, preview = null, lastPointer = 'mouse';
 
 function selectDiff(k) {
   diffKey = k; sessionStorage.setItem('cd-diff', k);
+  for (const b of root.querySelectorAll('.mapbtn')) { const n = +localStorage.getItem(`cd-stars:${b.dataset.k}:${k}`) || 0; b.querySelector('.best').innerHTML = n ? icon('crown').repeat(n) : ''; b.querySelector('.best').title = n ? `Best on ${DIFFS[k].name}: ${n} of 3 crowns` : ''; }
   for (const b of root.querySelectorAll('.dcard')) { b.classList.toggle('sel', b.dataset.k === k); b.setAttribute('aria-checked', b.dataset.k === k); }
 }
 selectDiff(DIFFS[sessionStorage.getItem('cd-diff')] ? sessionStorage.getItem('cd-diff') : 'knight');
@@ -152,7 +154,8 @@ function fitOverview() {
 }
 function fitAt(az) {
   const pts = [];
-  for (const lane of lanes) for (let d = 0; d <= lane.length; d += 6) pts.push(lane.pointAt(d));
+  // Frame the fight, not the far ends of the roads: the first stretch of each road may sit off-screen (its pin stays at the edge).
+  for (const lane of lanes) for (let d = lane.length * .28; d <= lane.length; d += 6) pts.push(lane.pointAt(d));
   for (const p of fortPoints) pts.push(new THREE.Vector3(...p));
   const box = new THREE.Box3().setFromPoints(pts), target = box.getCenter(new THREE.Vector3()).setY(6);
   const cam = camera.clone(); cam.clearViewOffset();
@@ -263,7 +266,7 @@ function deselect() {
 let anchor = null, cardEl = null, cardKind = null, cardKey = '';
 function openBuild(pad) {
   anchor = pad.pos; cardEl = null; $.cards.innerHTML = ''; cardKind = 'build';
-  const ids = TOWER_IDS, n = ids.length, R = innerWidth <= 760 ? 74 : 72;
+  const ids = TOWER_IDS, n = ids.length, R = (innerWidth <= 760 ? 74 : 72) + Math.max(0, n - 5) * 9;
   $.bm.innerHTML = `<div class="bm-ring"></div>` + ids.map((id, i) => {
     const a = (-135 + i * 360 / Math.max(n, 1)) * Math.PI / 180, x = Math.round(Math.cos(a) * R), y = Math.round(Math.sin(a) * R), c = TOWERS[id].levels[0].cost;
     return `<button class="bm-opt" data-a="build" data-t="${id}" style="left:${x}px;top:${y}px;--fx:${-x}px;--fy:${-y}px;animation-delay:${i * 40}ms" aria-label="Build ${TOWERS[id].name}, ${c} gold">
@@ -300,12 +303,18 @@ function setPreview(id) {
 function build(id) {
   const sel = state.selected;
   if (sel?.kind !== 'pad' || !id || !TOWERS[id]) return;
-  if (state.gold < TOWERS[id].levels[0].cost) return error();
+  if (state.gold < TOWERS[id].levels[0].cost) return error(TOWERS[id].levels[0].cost, $.bm.querySelector(`[data-t=${id}]`));
   const t = towers.buildTower(sel.pad, id);
   if (!t) return error();
   deselect();
 }
-function error() { bus.emit('ui:error'); flash($.goldStat, 'poor'); }
+// Refusals say why: the gold counter shakes, the option that was asked for shakes, and the hint names the shortfall.
+let denied = null;
+function error(cost, el) {
+  bus.emit('ui:error'); flash($.goldStat, 'poor');
+  if (el) flash(el, 'deny');
+  if (cost > state.gold) denied = { text: `You need ${cost - state.gold} more gold for that.`, until: performance.now() + 2200 };
+}
 
 // ── Tower panel ──
 function openTower(t) { anchor = t.pos; $.bm.innerHTML = ''; $.bm.classList.remove('open'); cardKind = 'tower'; renderTower(); }
@@ -326,7 +335,7 @@ const towerKey = t => `${t.level}|${t.kills}|${sellArmed === t}|${state.gold >= 
 function upgrade() {
   const t = state.selected?.tower; if (!t) return;
   const cost = towers.upgradeCost(t);
-  if (cost == null || state.gold < cost || !towers.upgradeTower(t)) return error();
+  if (cost == null || state.gold < cost || !towers.upgradeTower(t)) return error(cost, cardEl?.querySelector('[data-a=upgrade]'));
   preview = null; renderTower();
 }
 // Selling refunds only part of the cost, so it takes a second press (click or S) to confirm.
@@ -348,7 +357,7 @@ function placeAnchored() {
   if (bmOn) {
     const docked = compact && W > H && cardEl;   // landscape phone: card docked right, see ui-style
     const topLimit = $.top.offsetTop + $.top.offsetHeight + 90, botLimit = H - (compact && cardEl && !docked ? cardEl.offsetHeight + 130 : 90);
-    const bx = THREE.MathUtils.clamp(sx, 90, W - (docked ? cardEl.offsetWidth + 110 : 90)), by = THREE.MathUtils.clamp(sy, topLimit, Math.max(topLimit, botLimit));
+    const edge = (compact ? 74 : 72) + 52, bx = THREE.MathUtils.clamp(sx, edge, W - (docked ? cardEl.offsetWidth + 110 : edge)), by = THREE.MathUtils.clamp(sy, topLimit, Math.max(topLimit, botLimit));
     $.bm.style.transform = `translate(${bx}px,${by}px)`; $.bm.style.visibility = visible ? '' : 'hidden';
     sx = bx; sy = by;
   }
@@ -361,8 +370,14 @@ function placeAnchored() {
 }
 
 // Lane entries: during the build phase, a pin over each road's start says how many foes will come that way.
+// Pins count who is still to come on each road: the whole host in the build phase, then the ones not yet slain.
+function setPins(counts) {
+  [...$.pins.children].forEach((el, i) => { el.hidden = !counts[i]; set(el.firstChild, counts[i]); });
+}
 function placePins() {
-  if (state.phase !== 'build') return;
+  if (state.phase === 'wave') { const c = lanes.map(() => 0); for (let k = si; k < sched.length; k++) c[sched[k].lane]++; for (const e of state.enemies) c[e.lane]++; setPins(c); }
+  else if (state.phase !== 'build') { setPins([]); return; }
+  $.pins.style.visibility = $.bm.classList.contains('open') ? 'hidden' : '';
   lanes.forEach((lane, i) => {
     const el = $.pins.children[i]; if (el.hidden) return;
     proj.copy(lane.pointAt(4)).setY(proj.y + 3).project(camera);
@@ -415,8 +430,7 @@ function refreshHud(realDt) {
     set($.pvk, w ? (fighting ? `Wave ${n} · Battle` : `Next · Wave ${n}`) : 'All waves repelled');
     set($.pvname, w ? w.name : 'The keep stands'); $.pvname.classList.toggle('boss', !!w?.boss);
     $.pvlist.innerHTML = w ? composition(n).map(c => `<span class="en ${isBoss(c.type) ? 'boss' : ''}" title="${c.count} ${enemyName(c.type)} — ${[...c.lanes].map(l => laneNames[l]).join(' & ')}">${icon(c.type)}<b>${c.count}</b></span>`).join('') : '';
-    const perLane = lanes.map((_, i) => w ? schedule(n).filter(e => e.lane === i).length : 0);
-    [...$.pins.children].forEach((el, i) => { el.hidden = state.phase !== 'build' || !perLane[i]; el.firstChild.textContent = perLane[i]; });
+    if (!fighting) setPins(lanes.map((_, i) => w ? schedule(n).filter(e => e.lane === i).length : 0));
     $.pvbar.hidden = !fighting;
   }
   if (fighting) {
@@ -449,7 +463,7 @@ function refreshHud(realDt) {
     : state.towers.length === 0 ? k('Click a stone build site beside the road to raise your first tower.', 'Tap a stone build site beside the road to raise your first tower.')
     : k('When your defences are ready, sound the horn or press <kbd>Space</kbd>.', 'When your defences are ready, sound the horn.');
   // By wave 4 the commander knows the drill: keep only the hints tied to a selection.
-  const shown = sel || hover?.kind === 'pad' || state.wave < 4 ? hint : '';
+  const shown = denied && performance.now() < denied.until ? denied.text : sel || hover?.kind === 'pad' || state.wave < 4 ? hint : '';
   if (shown !== hintKey) { hintKey = shown; $.hint.innerHTML = shown && `${icon('crown')}<span>${shown}</span>`; if (shown) flash($.hint, 'swap'); }
 }
 
@@ -461,14 +475,18 @@ function banner(k, t, s = '', bad = false) {
 
 // ── End screens ──
 function showEnd(won) {
+  const stars = won ? (state.lives >= state.maxLives * .8 ? 3 : state.lives >= state.maxLives * .45 ? 2 : 1) : 0, key = `cd-stars:${LEVEL}:${diffKey}`;
+  const best = Math.max(stars, +localStorage.getItem(key) || 0); if (stars) localStorage.setItem(key, best);
+  const ids = Object.keys(LEVELS), next = ids[ids.indexOf(LEVEL) + 1];
   const cells = [['swords', won ? WAVES.length : Math.max(0, state.wave - 1), 'Waves survived'], ['skull', stats.slain, 'Foes slain'], ['coin', stats.earned, 'Gold earned'], ['tower', stats.built, 'Towers raised']];
   $.end.className = `screen end on ${won ? 'won' : 'lost'}`;
   root.classList.add('ended'); controls.autoRotate = !reduced;
   $.end.innerHTML = `<div class="end-card parch"><div class="end-top"><div class="medal">${icon(won ? 'crown' : 'skull')}</div></div>
-    <h2>${won ? 'Victory' : 'The Keep Has Fallen'}</h2>${fl}
+    <h2>${won ? 'Victory' : 'The Keep Has Fallen'}</h2>${won ? `<div class="stars" aria-label="${stars} of 3 stars">${[1, 2, 3].map(i => `<i class="${i <= stars ? 'on' : ''}" style="animation-delay:${.9 + i * .25}s">${icon('crown')}</i>`).join('')}</div>` : ''}${fl}
     <p class="lead">${won ? levelInfo.won : `The gate gave way during wave ${state.wave}.${Math.max(...stats.leaks) ? ` Most of the breach came by the ${laneNames[stats.leaks.indexOf(Math.max(...stats.leaks))]}: strengthen the towers there.` : ''}`}</p>
     <div class="ledger">${cells.map(([ic, v, l]) => `<div>${icon(ic)}<b data-to="${v}">0</b><span>${l}</span></div>`).join('')}</div>
-    <button class="cta" data-a="again">${won ? 'Play Again' : 'Rise Again'}</button>
+    ${won && stars < 3 ? `<p class="lead" style="margin-top:-6px;font-size:14px">${stars === 2 ? 'Lose fewer than a fifth of the keep for the third crown.' : 'Keep more of the walls standing for more crowns.'}</p>` : ''}
+    ${won && next ? `<button class="cta" data-a="next">Onward to ${LEVELS[next].name}</button><button class="link" data-a="again" style="margin-top:10px">Defend ${levelInfo.name} again</button>` : `<button class="cta" data-a="again">${won ? 'Play Again' : 'Rise Again'}</button>`}
     <button class="link" data-a="menu">${levelInfo.name} · ${DIFFS[diffKey].name} — change battlefield or difficulty</button></div>`;
   $.end.querySelector('.cta').focus({ preventScroll: true });
   const nums = [...$.end.querySelectorAll('[data-to]')], t0 = performance.now();
@@ -500,6 +518,7 @@ function act(a, el, e) {
   if (a === 'begin') return bus.emit('ui:click'), startGame();
   if (a === 'again') return bus.emit('ui:click'), restart();
   if (a === 'menu') return bus.emit('ui:click'), location.reload();
+  if (a === 'next') { bus.emit('ui:click'); const ids = Object.keys(LEVELS); return switchLevel(ids[ids.indexOf(LEVEL) + 1], diffKey); }
   if (a === 'horn') return bus.emit('ui:click'), callWave();
   if (a === 'close') return deselect();
   if (a === 'upgrade') return upgrade();
@@ -620,7 +639,7 @@ export function init() {
   document.addEventListener('visibilitychange', () => { if (document.hidden && !state.paused) toggle('pause'); });
   bus.on('enemy:death', ({ enemy }) => { stats.slain++; stats.earned += enemy?.bounty || 0; });
   bus.on('tower:build', () => { stats.built++; });
-  bus.on('enemy:leak', ({ enemy }) => { stats.leaks[enemy.lane]++; });
+  bus.on('enemy:leak', ({ enemy }) => { stats.leaks[enemy.lane]++; flash($.breach, 'on'); });
   bus.on('tower:sell', ({ tower }) => { if (state.selected?.tower === tower) deselect(); });
   addEventListener('resize', () => { if (views.overview && !tween && state.phase === 'title') views.overview = null; });
   const again = sessionStorage.getItem('cd-restart');

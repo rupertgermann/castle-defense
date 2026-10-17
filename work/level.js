@@ -20,4 +20,5 @@ export const LEVELS = {
 const asked = new URLSearchParams(location.search).get('level') || sessionStorage.getItem('cd-level');
 export const LEVEL = asked in LEVELS ? asked : 'castle';
 export const levelInfo = LEVELS[LEVEL];
-export function switchLevel(id) { if (id === LEVEL || !(id in LEVELS)) return; sessionStorage.setItem('cd-level', id); location.reload(); }
+// Reload without any ?level= so the stored choice wins.
+export function switchLevel(id, then = null) { if (id === LEVEL || !(id in LEVELS)) return; sessionStorage.setItem('cd-level', id); if (then) sessionStorage.setItem('cd-restart', then); location.replace(location.pathname); }

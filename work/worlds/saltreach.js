@@ -131,7 +131,7 @@ export function buildSaltreach(K) {
       void main(){vec3 d=normalize(vDirection); float h=max(d.y,0.); float a=max(dot(d,sunDirection),0.);
         vec3 col=mix(vec3(1.,.68,.48),vec3(.3,.44,.64),pow(h,.42)); col=mix(col,vec3(.98,.5,.42),(1.-h)*.35*(1.-a));
         col+=vec3(.95,.42,.12)*pow(a,5.)*(1.-h*.6)+vec3(1.,.55,.2)*pow(a,60.)*.6+vec3(3.,1.9,.9)*smoothstep(.9994,.9997,a);
-        float band=smoothstep(.02,.07,d.y)*(1.-smoothstep(.07,.16,d.y)); col=mix(col,vec3(.95,.62,.58),band*.35*(.4+.6*a));
+        float band=1.-smoothstep(0.,.14,d.y); col=mix(col,vec3(1.,.56,.3),band*.55*(.35+.65*a)); col=mix(col,vec3(.42,.36,.62),smoothstep(.25,.7,d.y)*.5);
         gl_FragColor=vec4(col,1.);}`,
   }));
   sky.castShadow = sky.receiveShadow = false;
@@ -495,7 +495,7 @@ export function buildSaltreach(K) {
   const fires = [[-6.5, BASE + 12, 25.6, 1], [0, BASE + 10.2, 23, 1], [6.5, BASE + 12, 25.6, 2], [-14, BASE + 9.5, 22, 2], [14, BASE + 9.5, 22, 2], [18, BASE + 12, -6, 2],
     [-34, BASE + 13, 4, 3], [31, BASE + 12.5, -8, 3], [-2, BASE + 24, -11, 3], [-19, BASE + 11, 2, 3], [-10, BASE + 17, -32, 3]];
   return {
-    height, BASE, gateCenter, sun, terrain, water, treeLocations,
+    height, BASE, gateCenter, sun, terrain, water, treeLocations, exposure: 1.0,
     bridgeDeck: { x0: Infinity, x1: -Infinity, z: 0, halfWidth: 0, y: 0 },   // no bridge; the causeway is terrain
     lanePaths, laneNames: ['beach landing', 'cliff road', 'causeway'],
     padSpots,

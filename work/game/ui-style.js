@@ -131,6 +131,8 @@ position:fixed;inset:0;pointer-events:none;font-family:var(--serif);color:var(--
 #cd .bm-opt .med .ic{font-size:38px;filter:drop-shadow(0 2px 2px rgba(0,0,0,.7))}
 #cd .bm-opt .cost{position:absolute;left:50%;bottom:-11px;transform:translateX(-50%);display:flex;align-items:center;gap:3px;padding:1px 7px 1px 3px;border-radius:9px;background:linear-gradient(#2d1f12,#170e07);box-shadow:0 0 0 1px #c9a24e,0 2px 4px rgba(0,0,0,.6);font-size:13px;font-weight:700;color:var(--gold-hi);white-space:nowrap}
 #cd .bm-opt .cost .ic{font-size:14px}
+#cd .deny{animation:cdPoor .45s ease-in-out}
+#cd .bm-opt.deny .cost b{color:#ff6a50}
 #cd .bm-opt .kbd{position:absolute;left:-2px;top:-2px;width:17px;height:17px;border-radius:50%;font-size:10.5px;font-weight:700;display:grid;place-items:center;background:#1a110a;color:var(--gold-hi);box-shadow:0 0 0 1px #c9a24e;opacity:.85}
 #cd .bm-opt:hover,#cd .bm-opt.hot{transform:scale(1.1);filter:brightness(1.12)}
 #cd .bm-opt:hover .med,#cd .bm-opt.hot .med{box-shadow:0 0 0 1.5px #0c0704,0 0 18px 2px rgba(255,205,100,.55),inset 0 2px 0 rgba(255,230,170,.3),inset 0 -8px 14px rgba(0,0,0,.4)}
@@ -166,7 +168,8 @@ position:fixed;inset:0;pointer-events:none;font-family:var(--serif);color:var(--
 #cd .kills{display:flex;align-items:center;gap:6px;font-size:13.5px;color:var(--ink2)}
 #cd .kills .ic{font-size:17px;color:#4a3320}
 #cd .kills b{color:var(--ink)}
-#cd .acts{display:flex;gap:8px;margin-top:12px}
+#cd .acts{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:8px;margin-top:12px}
+#cd .acts .btn{white-space:nowrap;min-width:0}
 #cd .btn{flex:1;position:relative;display:flex;align-items:center;justify-content:center;gap:7px;height:42px;padding:0 10px;border-radius:7px;border:1.5px solid transparent;font-size:15px;font-weight:700;font-variant:small-caps;letter-spacing:.07em;color:#fff5dc;text-shadow:0 1px 0 rgba(0,0,0,.7);
  background:${grain(.3)} padding-box,linear-gradient(#4f7a2c,#2f5317 60%,#223f10) padding-box,var(--rim) border-box;box-shadow:0 0 0 1px #0c0704,0 4px 8px -2px rgba(0,0,0,.6),inset 0 1px 0 rgba(220,255,180,.35);transition:transform .12s,filter .2s}
 #cd .btn .ic{font-size:17px}
@@ -221,6 +224,15 @@ position:fixed;inset:0;pointer-events:none;font-family:var(--serif);color:var(--
 #cd .mapbtn:hover{opacity:1;filter:none;transform:translateY(-2px)}
 #cd .mapbtn.sel{opacity:1;filter:none;box-shadow:0 0 0 1px #0c0704,0 0 0 3px rgba(255,214,120,.3),0 0 22px rgba(255,190,80,.3),inset 0 0 14px rgba(0,0,0,.5)}
 #cd .mapbtn.sel .ic{color:var(--gold-hi)}
+#cd .mapbtn{position:relative}
+#cd .mapbtn .best{position:absolute;right:6px;top:-9px;display:flex;gap:1px;font-size:13px;filter:drop-shadow(0 1px 2px #000)}
+#cd .mapbtn .best .ic{font-size:13px;color:var(--gold)}
+#cd .stars{display:flex;justify-content:center;gap:10px;margin:10px 0 0}
+#cd .stars i{font-size:40px;color:rgba(110,70,20,.25);filter:grayscale(1);animation:cdStar .5s cubic-bezier(.3,1.6,.4,1) backwards}
+#cd .stars i.on{color:inherit;filter:drop-shadow(0 2px 3px rgba(80,40,0,.5))}
+#cd .stars i .ic{font-size:40px}
+@keyframes cdStar{0%{transform:scale(0) rotate(-30deg);opacity:0}100%{transform:none;opacity:1}}
+#cd .link:focus-visible{outline:2px solid var(--ink2);outline-offset:3px}
 #cd .diff{display:flex;gap:14px;margin:12px 0 22px;flex-wrap:wrap;justify-content:center}
 #cd .dcard{width:172px;padding:14px 12px 12px;text-align:center;opacity:.8;transition:transform .2s,opacity .2s,filter .2s;filter:saturate(.7)}
 #cd .dcard .ic{font-size:36px;color:#c7ad85;filter:drop-shadow(0 2px 3px #000)}
@@ -270,6 +282,9 @@ position:fixed;inset:0;pointer-events:none;font-family:var(--serif);color:var(--
 #cd .pin b{min-width:22px;height:22px;padding:0 5px;border-radius:11px;display:grid;place-items:center;background:var(--red);color:#fff4d8;font-style:normal;font-size:13px;box-shadow:inset 0 0 0 1px #f0a080}
 #cd .pin::after{content:"";position:absolute;left:50%;bottom:-6px;margin-left:-6px;border:6px solid transparent;border-bottom:0;border-top-color:#23170d}
 #cd .pin[hidden]{display:none}
+#cd .breach{position:absolute;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center,transparent 52%,rgba(150,16,8,.55) 100%)}
+#cd .breach.on{animation:cdBreach .9s ease-out}
+@keyframes cdBreach{0%{opacity:0}12%{opacity:1}100%{opacity:0}}
 
 /* Mid widths (small laptops, landscape tablets): the herald drops to its own centred row instead of colliding. */
 @media (min-width:761px) and (max-width:1100px){#cd .top{flex-wrap:wrap;row-gap:8px}#cd .herald{order:3;flex-basis:100%;justify-content:center}}
