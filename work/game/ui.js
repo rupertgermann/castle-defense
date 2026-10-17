@@ -61,14 +61,17 @@ root.innerHTML = `<style>${CSS}</style>${SPRITE}
     <button class="ib speed" data-a="speed" data-r="speed" data-tip="Game speed" aria-label="Game speed"></button>
     <button class="ib" data-a="pause" data-r="pause" data-tip="Pause" aria-label="Pause">${icon('pause')}<span class="kbd">P</span></button>
     <button class="ib" data-a="mute" data-r="mute" data-tip="Sound" aria-label="Mute">${icon('sound')}<span class="kbd">M</span></button>
-    <button class="ib restart" data-a="restart" data-r="restart" data-tip="Restart the siege" aria-label="Restart">${icon('restart')}</button>
   </div>
 </div>
 <div class="hint parch" data-r="hint" aria-live="polite"></div>
 <div class="banner" data-r="banner" aria-live="polite"></div>
+<div data-r="pins">${lanes.map((_, i) => `<div class="pin" hidden><b></b><span>${laneNames[i]}</span></div>`).join('')}</div>
 <div class="bm" data-r="bm"></div>
 <div data-r="cards"></div>
-<div class="paused leather">Paused<small>Press P or ▶ to resume</small></div>
+<div class="paused leather" role="dialog" aria-label="Paused">Paused
+  <button class="pbtn" data-a="pause">${icon('play')} Resume <span class="kbd">P</span></button>
+  <button class="pbtn" data-a="again">${icon('restart')} Restart the siege</button>
+  <button class="pbtn" data-a="menu">Change battlefield</button></div>
 <div class="screen title on" data-r="title">
   <div class="crest">${levelInfo.crest}</div>
   <h1 class="gtitle">${levelInfo.name}</h1>
@@ -88,15 +91,15 @@ const $ = {};
 for (const el of root.querySelectorAll('[data-r]')) $[el.dataset.r] = el;
 
 // ── Flow state ──
-let diffKey = 'knight', countdown = null, sched = [], si = 0, waveT = 0, muted = false, restartArmed = 0;
-const stats = { slain: 0, earned: 0, built: 0 };
+let diffKey = 'knight', countdown = null, sched = [], si = 0, waveT = 0, muted = localStorage.getItem('cd-muted') === '1';
+const stats = { slain: 0, earned: 0, built: 0, leaks: lanes.map(() => 0) };
 let hover = null, hoverXY = null, preview = null, lastPointer = 'mouse';
 
 function selectDiff(k) {
-  diffKey = k;
+  diffKey = k; sessionStorage.setItem('cd-diff', k);
   for (const b of root.querySelectorAll('.dcard')) { b.classList.toggle('sel', b.dataset.k === k); b.setAttribute('aria-checked', b.dataset.k === k); }
 }
-selectDiff('knight');
+selectDiff(DIFFS[sessionStorage.getItem('cd-diff')] ? sessionStorage.getItem('cd-diff') : 'knight');
 
 function startGame(k = diffKey, instant = false) {
   if (state.phase !== 'title') return;
@@ -104,7 +107,7 @@ function startGame(k = diffKey, instant = false) {
   const d = DIFFS[k];
   state.gold = Math.round(BASE_GOLD * d.gold); state.lives = state.maxLives = d.lives; state.wave = 0; state.phase = 'build';
   countdown = null; dispGold = state.gold; lastGold = state.gold; lastLives = state.lives;
-  $.title.classList.add('out');
+  $.title.classList.add('out'); document.activeElement?.blur();
   setTimeout(() => $.title.classList.remove('on', 'out'), instant ? 0 : 800);
   root.classList.remove('intro');
   controls.autoRotate = false;
@@ -250,19 +253,20 @@ function pickAt(x, y) {
 const selObj = s => s && (s.tower || s.pad);
 let hlKey = [null, null];
 function syncHighlight() {
-  const s = state.selected || hover, p = state.selected?.kind === 'pad' ? preview : null;
+  // preview: the hovered build option on a pad, or 'up' while hovering a tower's Upgrade button.
+  const s = state.selected || hover, p = state.selected?.kind === 'pad' ? preview : state.selected && preview === 'up' ? state.selected.tower.typeId : null;
   if (selObj(s) === hlKey[0] && p === hlKey[1]) return;
   hlKey = [selObj(s), p];
   towers.setHighlight?.(s, p || undefined);
 }
 function select(sel) {
   if (!sel) return deselect();
-  state.selected = sel; preview = null;
+  state.selected = sel; preview = null; sellArmed = null;
   if (sel.kind === 'pad') openBuild(sel.pad); else openTower(sel.tower);
   bus.emit('ui:click');
 }
 function deselect() {
-  state.selected = null; preview = null;
+  state.selected = null; preview = null; sellArmed = null;
   $.bm.innerHTML = ''; $.bm.classList.remove('open'); $.cards.innerHTML = ''; cardEl = null; anchor = null;
 }
 
@@ -286,12 +290,12 @@ const statRows = (L, N) => [['dmg', 'Damage', L.damage, N?.damage, 0], ['range',
   .map(([ic, k, v, nv, dp, u = '']) => `${icon(ic)}<span>${k}</span><b>${+(+v).toFixed(dp)}${u}${nv != null && nv !== v ? `<em>▲ ${+(nv - v).toFixed(dp)}</em>` : ''}</b>`).join('')
   + (L.splash ? `${icon('blast')}<span>Splash</span><b>${L.splash} m</b>` : '') + (L.slow ? `${icon('magic')}<span>Slows</span><b>${Math.round((1 - L.slow.factor) * 100)}%</b>` : '')
   + (L.burn ? `${icon('fire')}<span>Burns</span><b>${L.burn.dps}/s · ${L.burn.duration} s${N?.burn && N.burn.dps !== L.burn.dps ? `<em>▲ ${N.burn.dps - L.burn.dps}</em>` : ''}</b>` : '');
-const cardHead = (id, def, extra = '') => `<div class="card-h"><span class="med">${icon(towerIcon(id))}</span><div><div class="nm">${def.name}</div>
+const cardHead = (id, def, extra = '', closable = true) => `<div class="card-h"><span class="med">${icon(towerIcon(id))}</span><div><div class="nm">${def.name}</div>
   <div class="dt ${def.damageType}">${icon(def.damageType in DTYPE ? def.damageType : 'pierce')}${DTYPE[def.damageType] || def.damageType || ''} damage</div>${extra}</div>
-  <button class="x" data-a="close" aria-label="Close">${icon('close')}</button></div>`;
+  ${closable ? `<button class="x" data-a="close" aria-label="Close">${icon('close')}</button>` : ''}</div>`;
 function showBuildCard(id) {
   const def = TT()[id], L = def.levels[0], poor = state.gold < L.cost;
-  $.cards.innerHTML = `<div class="card parch">${cardHead(id, def)}<div class="card-b"><p class="desc">${def.description || ''}</p>
+  $.cards.innerHTML = `<div class="card parch">${cardHead(id, def, '', touch)}<div class="card-b"><p class="desc">${def.description || ''}</p>
     <div class="stats">${statRows(L)}</div>
     <div class="costline"><span>Cost</span><b class="${poor ? 'poor' : ''}">${icon('coin')}${L.cost}</b></div>
     ${poor ? `<div class="need">You need ${L.cost - state.gold} more gold</div>` : touch ? `<div class="acts"><button class="btn" data-a="build" data-t="${id}">${icon('up')} Build</button></div>` : ''}</div></div>`;
@@ -323,19 +327,22 @@ function renderTower() {
     <div class="kills">${icon('skull')}<span>Foes slain</span><b>${t.kills || 0}</b></div>
     <div class="acts">${cost == null ? `<button class="btn" disabled>${icon('crown')} Mastered</button>` :
       `<button class="btn" data-a="upgrade" ${state.gold < cost ? 'disabled' : ''}>${icon('up')} Upgrade <span class="c">${icon('coin')}${cost}</span></button>`}
-      <button class="btn sell" data-a="sell">Sell <span class="c">${icon('coin')}+${sell}</span></button></div>
+      <button class="btn sell ${sellArmed === t ? 'armed' : ''}" data-a="sell">${sellArmed === t ? 'Confirm' : 'Sell'} <span class="c">${icon('coin')}+${sell}</span></button></div>
     ${cost != null && state.gold < cost ? `<div class="need">${cost - state.gold} more gold to upgrade</div>` : ''}</div></div>`;
   cardEl = $.cards.firstChild; cardKey = towerKey(t);
 }
-const towerKey = t => `${t.level}|${t.kills}|${state.gold >= (upgradeCostOf(t) ?? 1e9)}|${state.gold}`;
+const towerKey = t => `${t.level}|${t.kills}|${sellArmed === t}|${state.gold >= (upgradeCostOf(t) ?? 1e9)}|${state.gold}`;
 function upgrade() {
   const t = state.selected?.tower; if (!t) return;
   const cost = upgradeCostOf(t);
   if (cost == null || state.gold < cost || !towers.upgradeTower?.(t)) return error();
-  renderTower();
+  preview = null; renderTower();
 }
+// Selling refunds only part of the cost, so it takes a second press (click or S) to confirm.
+let sellArmed = null;
 function sell() {
   const t = state.selected?.tower; if (!t || !towers.sellTower) return error();
+  if (sellArmed !== t) { sellArmed = t; bus.emit('ui:click'); return renderTower(); }
   towers.sellTower(t); deselect();
 }
 
@@ -361,6 +368,17 @@ function placeAnchored() {
   }
 }
 
+// Lane entries: during the build phase, a pin over each road's start says how many foes will come that way.
+function placePins() {
+  if (state.phase !== 'build') return;
+  lanes.forEach((lane, i) => {
+    const el = $.pins.children[i]; if (el.hidden) return;
+    proj.copy(lane.pointAt(4)).setY(proj.y + 3).project(camera);
+    const x = THREE.MathUtils.clamp((proj.x + 1) / 2 * innerWidth, 60, innerWidth - 60), y = THREE.MathUtils.clamp((1 - proj.y) / 2 * innerHeight, 110, innerHeight - 70);
+    el.style.transform = `translate(${x}px,${y}px)`;
+  });
+}
+
 // ── HUD refresh ──
 let dispGold = state.gold, lastGold = state.gold, lastLives = state.lives, hudKey = '', hintKey = '';
 function flash(el, cls) { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
@@ -380,7 +398,9 @@ function refreshHud(realDt) {
     hudKey = key;
     set($.pvk, w ? (fighting ? `Wave ${n} · Battle` : `Next · Wave ${n}`) : 'All waves repelled');
     set($.pvname, w ? w.name : 'The keep stands'); $.pvname.classList.toggle('boss', !!w?.boss);
-    $.pvlist.innerHTML = w ? composition(n).map(c => `<span class="en ${isBoss(c.type) ? 'boss' : ''}" title="${enemyName(c.type)} — ${[...c.lanes].map(l => laneNames[l]).join(' & ')}">${icon(enemyIcon(c.type))}<b>${c.count}</b>${[...c.lanes].sort().map(l => `<i class="l${l}">${l ? 'E' : 'S'}</i>`).join('')}</span>`).join('') : '';
+    $.pvlist.innerHTML = w ? composition(n).map(c => `<span class="en ${isBoss(c.type) ? 'boss' : ''}" title="${c.count} ${enemyName(c.type)} — ${[...c.lanes].map(l => laneNames[l]).join(' & ')}">${icon(enemyIcon(c.type))}<b>${c.count}</b></span>`).join('') : '';
+    const perLane = lanes.map((_, i) => w ? schedule(n).filter(e => e.lane === i).length : 0);
+    [...$.pins.children].forEach((el, i) => { el.hidden = state.phase !== 'build' || !perLane[i]; el.firstChild.textContent = perLane[i]; });
     $.pvbar.hidden = !fighting;
   }
   if (fighting) {
@@ -395,21 +415,24 @@ function refreshHud(realDt) {
     : canCall ? (touch ? `Call wave ${n}` : `Call wave ${n} · Space`) : '';
   if ($.hornsub.dataset.v !== sub) { $.hornsub.dataset.v = sub; $.hornsub.innerHTML = sub; }
   const sp = `${icon('speed' + state.speed)}<b>${state.speed}×</b><span class="kbd">F</span>`;
-  if ($.speed.dataset.v !== sp) { $.speed.dataset.v = sp; $.speed.innerHTML = sp; }
+  if ($.speed.dataset.v !== sp) { $.speed.dataset.v = sp; $.speed.innerHTML = sp; $.speed.setAttribute('aria-label', `Game speed ${state.speed}×`); }
   $.speed.classList.toggle('on', state.speed > 1);
-  root.classList.toggle('is-paused', state.paused);
+  root.classList.toggle('is-paused', state.paused); root.classList.toggle('has-sel', !!state.selected);
   const pi = state.paused ? 'play' : 'pause';
-  if ($.pause.dataset.v !== pi) { $.pause.dataset.v = pi; $.pause.innerHTML = `${icon(pi)}<span class="kbd">P</span>`; $.pause.classList.toggle('on', state.paused); }
+  if ($.pause.dataset.v !== pi) { $.pause.dataset.v = pi; $.pause.innerHTML = `${icon(pi)}<span class="kbd">P</span>`; $.pause.classList.toggle('on', state.paused); $.pause.dataset.tip = state.paused ? 'Resume' : 'Pause'; $.pause.setAttribute('aria-label', $.pause.dataset.tip); }
   // Contextual hint.
   const k = (d, t = d) => touch ? t : d;
   const sel = state.selected;
   const hint = sel?.kind === 'pad' ? k('Hover a tower to preview its reach. Click or press <kbd>1</kbd>–<kbd>5</kbd> to build.', 'Tap a tower to preview it, tap Build to raise it.')
+    : sel?.kind === 'tower' && sellArmed ? k('Press <kbd>S</kbd> again to sell, <kbd>Esc</kbd> to keep the tower.', 'Tap Confirm to sell this tower.')
     : sel?.kind === 'tower' ? k('<kbd>U</kbd> upgrade · <kbd>S</kbd> sell · <kbd>Esc</kbd> close', 'Upgrade or sell this tower. Tap the ground to close.')
     : fighting ? k('Click a tower to upgrade it mid-battle. <kbd>F</kbd> hastens the fight, <kbd>P</kbd> pauses.', 'Tap a tower to upgrade it mid-battle.')
     : countdown != null ? 'Sound the horn early — every second saved is gold for the treasury.'
     : state.towers.length === 0 ? k('Click a stone build site beside the road to raise your first tower.', 'Tap a stone build site beside the road to raise your first tower.')
     : k('When your defences are ready, sound the horn or press <kbd>Space</kbd>.', 'When your defences are ready, sound the horn.');
-  if (hint !== hintKey) { hintKey = hint; $.hint.innerHTML = `${icon('crown')}<span>${hint}</span>`; flash($.hint, 'swap'); }
+  // By wave 4 the commander knows the drill: keep only the hints tied to a selection.
+  const shown = sel || state.wave < 4 ? hint : '';
+  if (shown !== hintKey) { hintKey = shown; $.hint.innerHTML = shown && `${icon('crown')}<span>${shown}</span>`; if (shown) flash($.hint, 'swap'); }
 }
 
 function banner(k, t, s = '', bad = false) {
@@ -425,10 +448,11 @@ function showEnd(won) {
   root.classList.add('ended'); controls.autoRotate = !reduced;
   $.end.innerHTML = `<div class="end-card parch"><div class="end-top"><div class="medal">${icon(won ? 'crown' : 'skull')}</div></div>
     <h2>${won ? 'Victory' : 'The Keep Has Fallen'}</h2>${fl}
-    <p class="lead">${won ? levelInfo.won : `The gate gave way during wave ${state.wave}. Bards will sing of how long the walls held.`}</p>
+    <p class="lead">${won ? levelInfo.won : `The gate gave way during wave ${state.wave}. Most of the breach came by the ${laneNames[stats.leaks.indexOf(Math.max(...stats.leaks))]}: strengthen the towers there.`}</p>
     <div class="ledger">${cells.map(([ic, v, l]) => `<div>${icon(ic)}<b data-to="${v}">0</b><span>${l}</span></div>`).join('')}</div>
     <button class="cta" data-a="again">${won ? 'Play Again' : 'Rise Again'}</button>
-    <div class="how" style="color:var(--ink2);text-shadow:none;margin-top:12px;font-size:13px">${DIFFS[diffKey].name} difficulty</div></div>`;
+    <button class="link" data-a="menu">${levelInfo.name} · ${DIFFS[diffKey].name} — change battlefield or difficulty</button></div>`;
+  $.end.querySelector('.cta').focus({ preventScroll: true });
   const nums = [...$.end.querySelectorAll('[data-to]')], t0 = performance.now();
   (function tick(now) {
     const k = reduced ? 1 : Math.min(1, (now - t0 - 500) / 1400), e = 1 - (1 - Math.max(0, k)) ** 3;
@@ -440,14 +464,24 @@ function showEnd(won) {
 // ── Input ──
 function toggle(action) {
   if (action === 'speed') state.speed = state.speed % 3 + 1;
-  else if (action === 'pause') { if (state.phase === 'build' || state.phase === 'wave') state.paused = !state.paused; }
-  else if (action === 'mute') { muted = !muted; audio.setMuted?.(muted); $.mute.innerHTML = `${icon(muted ? 'mute' : 'sound')}<span class="kbd">M</span>`; $.mute.classList.toggle('on', muted); }
+  else if (action === 'pause') {
+    if (state.phase !== 'build' && state.phase !== 'wave') return;
+    state.paused = !state.paused;
+    if (state.paused) { deselect(); requestAnimationFrame(() => root.querySelector('.pbtn').focus({ preventScroll: true })); }
+    else document.activeElement?.blur();
+  }
+  else if (action === 'mute') { muted = !muted; localStorage.setItem('cd-muted', muted ? '1' : '0'); showMute(); }
+}
+function showMute() {
+  audio.setMuted?.(muted); $.mute.innerHTML = `${icon(muted ? 'mute' : 'sound')}<span class="kbd">M</span>`; $.mute.classList.toggle('on', muted);
+  $.mute.dataset.tip = muted ? 'Sound off' : 'Sound on'; $.mute.setAttribute('aria-pressed', muted);
 }
 function act(a, el, e) {
   if (a === 'diff') return selectDiff(el.dataset.k), bus.emit('ui:click');
   if (a === 'level') return bus.emit('ui:click'), switchLevel(el.dataset.k);
   if (a === 'begin') return bus.emit('ui:click'), startGame();
   if (a === 'again') return bus.emit('ui:click'), restart();
+  if (a === 'menu') return bus.emit('ui:click'), location.reload();
   if (a === 'horn') return bus.emit('ui:click'), callWave();
   if (a === 'close') return deselect();
   if (a === 'upgrade') return upgrade();
@@ -457,20 +491,18 @@ function act(a, el, e) {
     if (touch && lastPointer !== 'mouse' && el.classList.contains('bm-opt') && preview !== id) return setPreview(id);
     return build(id);
   }
-  if (a === 'restart') {
-    if (performance.now() - restartArmed < 2500) return restart();
-    restartArmed = performance.now(); $.restart.classList.add('armed'); $.restart.dataset.tip = 'Click again to restart';
-    setTimeout(() => { $.restart.classList.remove('armed'); $.restart.dataset.tip = 'Restart the siege'; }, 2500);
-    return;
-  }
   bus.emit('ui:click'); toggle(a);
 }
 root.addEventListener('click', e => { const el = e.target.closest('[data-a]'); if (el && !el.disabled) act(el.dataset.a, el, e); });
 root.addEventListener('pointerover', e => {
-  const el = e.target.closest('.bm-opt'); if (el && e.pointerType === 'mouse') setPreview(el.dataset.t);
+  if (e.pointerType !== 'mouse') return;
+  const el = e.target.closest('.bm-opt'); if (el) setPreview(el.dataset.t);
+  if (e.target.closest('[data-a=upgrade]')) preview = 'up';
 });
 root.addEventListener('pointerout', e => {
-  const el = e.target.closest('.bm-opt'); if (el && e.pointerType === 'mouse' && !el.contains(e.relatedTarget)) setPreview(null);
+  if (e.pointerType !== 'mouse') return;
+  const el = e.target.closest('.bm-opt, [data-a=upgrade]'); if (!el || el.contains(e.relatedTarget)) return;
+  if (el.dataset.a === 'upgrade') preview = null; else setPreview(null);
 });
 
 let unlocked = false;
@@ -486,7 +518,7 @@ function setupPointer() {
     down = null;
     if (state.phase !== 'build' && state.phase !== 'wave') return;
     const hit = pickAt(e.clientX, e.clientY);
-    if (hit) select(hit); else if (state.selected) deselect();
+    if (hit && selObj(hit) !== selObj(state.selected)) select(hit); else if (state.selected) deselect();
   });
   el.addEventListener('pointermove', e => { if (e.pointerType === 'mouse') hoverXY = [e.clientX, e.clientY]; });
   el.addEventListener('pointerleave', () => { hoverXY = null; hover = null; });
@@ -496,13 +528,19 @@ addEventListener('keydown', e => {
   unlock();
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   const key = e.key.toLowerCase();
-  if (state.phase === 'title') { if (key === 'enter' || key === ' ') { e.preventDefault(); startGame(); } return; }
-  if (state.phase === 'won' || state.phase === 'lost') { if (key === 'enter' && $.end.classList.contains('on')) restart(); return; }
+  // Title: Space activates the focused button (choose a card); Enter begins the siege, with the focused difficulty.
+  if (state.phase === 'title') {
+    const btn = e.target.closest?.('#cd button');
+    if (key === ' ' && btn || key === 'enter' && btn?.dataset.a === 'level') return;
+    if (key === 'enter' || key === ' ') { e.preventDefault(); if (btn?.dataset.a === 'diff') selectDiff(btn.dataset.k); startGame(); }
+    return;
+  }
+  if (state.phase === 'won' || state.phase === 'lost') { if (key === 'enter' && $.end.classList.contains('on') && !e.target.closest?.('#cd button')) restart(); return; }
   if (key === ' ') { e.preventDefault(); callWave(); }
   else if (key === 'p') toggle('pause');
   else if (key === 'f') toggle('speed');
   else if (key === 'm') toggle('mute');
-  else if (key === 'escape') { if (state.selected) deselect(); else if (state.paused) toggle('pause'); }
+  else if (key === 'escape') { if (state.selected) deselect(); else toggle('pause'); }
   else if (key === 'u') upgrade();
   else if (key === 's') sell();
   else if (key >= '1' && key <= '9' && state.selected?.kind === 'pad' && Object.keys(TT())[key - 1]) build(Object.keys(TT())[key - 1]);
@@ -511,9 +549,10 @@ addEventListener('keydown', e => {
 
 // ── Module API ──
 export function init() {
-  setupCamera(); setupPointer();
+  setupCamera(); setupPointer(); showMute();
   bus.on('enemy:death', ({ enemy }) => { stats.slain++; stats.earned += enemy?.bounty || 0; });
   bus.on('tower:build', () => { stats.built++; });
+  bus.on('enemy:leak', ({ enemy }) => { stats.leaks[enemy.lane]++; });
   bus.on('tower:sell', ({ tower }) => { if (state.selected?.tower === tower) deselect(); });
   addEventListener('resize', () => { if (views.overview && !tween && state.phase === 'title') views.overview = null; });
   const again = sessionStorage.getItem('cd-restart');
@@ -543,7 +582,7 @@ export function update(dt, realDt = dt) {
   if (state.phase !== 'title') refreshHud(realDt);
   if (state.selected?.kind === 'tower' && cardKey !== towerKey(state.selected.tower)) renderTower();
   if (state.selected?.kind === 'pad' && preview && cardKey !== preview + (state.gold < TT()[preview].levels[0].cost)) showBuildCard(preview);
-  placeAnchored();
+  placeAnchored(); placePins();
 }
 
 export const debug = {

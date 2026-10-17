@@ -293,10 +293,10 @@ if (water?.isWater) {
 }
 const bloom = halfRes(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), .15, .5, 1.45)); composer.addPass(bloom);
 const grade = new ShaderPass({
-  uniforms: { tDiffuse: { value: null }, tDepth: { value: ao.depthTexture }, inverseProjection: { value: camera.projectionMatrixInverse }, cameraWorld: { value: camera.matrixWorld }, mistColor: { value: new THREE.Color(world.mist.color) } },
+  uniforms: { tDiffuse: { value: null }, tDepth: { value: ao.depthTexture }, inverseProjection: { value: camera.projectionMatrixInverse }, cameraWorld: { value: camera.matrixWorld }, depthShift: { value: 0 }, mistAmount: { value: 1 }, mistColor: { value: new THREE.Color(world.mist.color) } },
   vertexShader: 'varying vec2 vUv; void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
-  fragmentShader: `uniform sampler2D tDiffuse; uniform sampler2D tDepth; uniform mat4 inverseProjection; uniform mat4 cameraWorld; uniform vec3 mistColor; varying vec2 vUv;
-    void main(){vec3 c=texture2D(tDiffuse,vUv).rgb; float depth=texture2D(tDepth,vUv).x; vec4 view=inverseProjection*vec4(vUv*2.-1.,depth*2.-1.,1.); view/=view.w; vec3 world=(cameraWorld*view).xyz; ${world.mist.glsl} c=mix(c,mistColor,mist); float l=dot(c,vec3(.2126,.7152,.0722)); c=mix(vec3(l),c,.97); float vign=smoothstep(.85,.25,length((vUv-.5)*vec2(1.,.85))); c*=.90+.10*vign; gl_FragColor=vec4(c,1.);}`
+  fragmentShader: `uniform sampler2D tDiffuse; uniform sampler2D tDepth; uniform mat4 inverseProjection; uniform mat4 cameraWorld; uniform float depthShift; uniform float mistAmount; uniform vec3 mistColor; varying vec2 vUv;
+    void main(){vec3 c=texture2D(tDiffuse,vUv).rgb; float depth=texture2D(tDepth,vUv).x; vec4 view=inverseProjection*vec4(vUv*2.-1.,depth*2.-1.,1.); view/=view.w; vec3 world=(cameraWorld*view).xyz; view.z+=depthShift; ${world.mist.glsl} c=mix(c,mistColor,mist*mistAmount); float l=dot(c,vec3(.2126,.7152,.0722)); c=mix(vec3(l),c,.97); float vign=smoothstep(.85,.25,length((vUv-.5)*vec2(1.,.85))); c*=.90+.10*vign; gl_FragColor=vec4(c,1.);}`
 });
 grade.uniforms.tDepth.value = ao.depthTexture;
 grade.uniforms.inverseProjection.value = camera.projectionMatrixInverse;
@@ -319,12 +319,23 @@ function render(now) {
   for (const hook of frameHooks) hook(dt, time);
   controls.update();
   keepViewClear();
+  focusHaze();
   if (!reducedMotion) world.animate(time);
   composer.render(); frameCount++;
   if (frameCount === 1) { document.body.classList.add('ready'); window.__sceneReady = true; renderer.shadowMap.autoUpdate = false; }
 }
 requestAnimationFrame(render);
 
+// Aerial haze is tuned for the title framing. Pulled back further (the battle overview), measure it from the focus
+// distance instead, so zooming out keeps the field crisp rather than washing the whole map in fog.
+const hazeRef = initialPosition.distanceTo(world.view.target), fogDensity = scene.fog?.density;
+function focusHaze() {
+  const d = camera.position.distanceTo(controls.target);
+  if (scene.fog) scene.fog.density = fogDensity * hazeRef / Math.max(hazeRef, d);
+  grade.uniforms.depthShift.value = Math.max(0, d - hazeRef);
+  // Valley mist reads as a soft bank from a low angle but as a flat white stripe from above: fade it as the view tips down.
+  grade.uniforms.mistAmount.value = 1 - THREE.MathUtils.smoothstep((camera.position.y - controls.target.y) / d, .45, .75);
+}
 // Keep the camera above the ground with a clear line of sight: when the camera half of the camera→target
 // segment dips into a hill, raise the camera just enough (Frostmere's peaks ring the pass). The target half is
 // left alone: overview targets may sit below a plateau on purpose.
