@@ -31,7 +31,7 @@ const fl = `<svg class="fl" aria-hidden="true"><use href="#i-flourish" width="10
 root.innerHTML = `<style>${CSS}</style>${SPRITE}
 <div class="veil"></div>
 <div class="top" data-r="top">
-  <div class="res leather" role="status">
+  <div class="res leather">
     <div class="stat gold" data-r="goldStat" data-tip="Gold · earned from slain foes and repelled waves">${icon('coin')}<b data-r="gold">0</b></div>
     <div class="sep"></div>
     <div class="stat lives" data-r="livesStat" data-tip="Keep strength · each foe that breaches the gate wounds it">${icon('heart')}<b data-r="lives">0</b><small data-r="maxLives"></small></div>
@@ -65,10 +65,10 @@ root.innerHTML = `<style>${CSS}</style>${SPRITE}
   <div class="maps" role="radiogroup" aria-label="Battlefield">${Object.entries(LEVELS).map(([k, l]) => `
     <button class="mapbtn leather ${k === LEVEL ? 'sel' : ''}" data-a="level" data-k="${k}" role="radio" aria-checked="${k === LEVEL}">${icon(k === 'castle' ? 'tower' : 'peak')}<span><b>${l.name}</b><small>${l.place}</small></span></button>`).join('')}</div>
   <div class="diff" role="radiogroup" aria-label="Difficulty">${Object.entries(DIFFS).map(([k, d]) => `
-    <button class="dcard leather" data-a="diff" data-k="${k}" role="radio">${icon(d.icon)}<h3>${d.name}</h3><p>${d.desc}</p>
-    <div class="m"><span>${icon('heart')}${d.lives}</span><span>${icon('coin')}${Math.round(BASE_GOLD * d.gold)}</span><span>${icon('skull')}${Math.round(d.hp * 100)}%</span></div></button>`).join('')}</div>
+    <button class="dcard leather" data-a="diff" data-k="${k}" role="radio" aria-label="${d.name}: ${d.desc} ${d.lives} keep strength, ${Math.round(BASE_GOLD * d.gold)} starting gold, foes at ${Math.round(d.hp * 100)}% toughness">${icon(d.icon)}<h3>${d.name}</h3><p>${d.desc}</p>
+    <div class="m"><span title="Keep strength">${icon('heart')}${d.lives}</span><span title="Starting gold">${icon('coin')}${Math.round(BASE_GOLD * d.gold)}</span><span title="Foe toughness">${icon('skull')}${Math.round(d.hp * 100)}%</span></div></button>`).join('')}</div>
   <button class="cta" data-a="begin">Defend the Keep</button>
-  <div class="how">Raise towers on the stone build sites beside the roads. Sound the horn early for bonus gold.<span class="desk"><br><kbd>Space</kbd> horn · ${KEYS} build · <kbd>U</kbd> upgrade · <kbd>S</kbd> sell · <kbd>F</kbd> speed · <kbd>P</kbd> pause</span></div>
+  <div class="how">Raise towers on the stone build sites beside the roads. Sound the horn early for bonus gold.<span class="desk"><br><kbd>Tab</kbd> / arrows pick a site · <kbd>Space</kbd> horn · ${KEYS} build · <kbd>U</kbd> upgrade · <kbd>S</kbd> sell · <kbd>F</kbd> speed · <kbd>P</kbd> pause</span></div>
 </div>
 <div class="screen end" data-r="end"></div>`;
 document.body.appendChild(root);
@@ -213,7 +213,7 @@ function setupCamera() {
   titleOffset(); addEventListener('resize', () => { if (state.phase === 'title') titleOffset(); });
   const el = renderer.domElement;
   el.setAttribute('role', 'application');
-  el.setAttribute('aria-label', `${levelInfo.name}, a castle tower-defense game. Click stone build sites to raise towers and click towers to upgrade or sell them. Drag to rotate, right-drag or two fingers to pan, scroll or pinch to zoom, double-click to reframe. Space sounds the next wave, P pauses, F changes speed.`);
+  el.setAttribute('aria-label', `${levelInfo.name}, a castle tower-defense game. Click stone build sites to raise towers and click towers to upgrade or sell them. Drag to rotate, right-drag or two fingers to pan, scroll or pinch to zoom, double-click to reframe. Tab steps through build sites and arrow keys move between them; number keys build, U upgrades, S sells. Space sounds the next wave, P pauses, F changes speed.`);
   // Replace the scene's double-click reset with the game overview (capture phase runs before the canvas listener).
   addEventListener('dblclick', e => { if (e.target !== el) return; e.stopPropagation(); if (state.phase !== 'title') flyTo('overview'); }, true);
 }
@@ -512,6 +512,45 @@ function setupPointer() {
   el.addEventListener('pointerleave', () => { hoverXY = null; hover = null; });
 }
 
+// ── Keyboard site navigation ──
+// With the map focused, Tab / Shift+Tab sweep the build sites around the keep; while one is selected the arrow keys
+// jump to the nearest site in that direction on screen. The camera eases over to keep the choice in view.
+const siteSel = p => p.tower ? { kind: 'tower', tower: p.tower } : { kind: 'pad', pad: p };
+const toScreen = v => { proj.copy(v).project(camera); return [proj.x * innerWidth / 2, -proj.y * innerHeight / 2]; };
+let lastSite = null;   // so Tab after building carries on from the site just used
+function keyNav(step, dir) {
+  const pads = towers.pads, cur = selObj(state.selected)?.pad || selObj(state.selected) || lastSite;
+  let next;
+  if (!cur) next = pads.reduce((b, p) => Math.hypot(...toScreen(p.pos)) < Math.hypot(...toScreen(b.pos)) ? p : b);
+  else if (step) {
+    const ang = p => Math.atan2(p.pos.x - gatePoint.x, p.pos.z - gatePoint.z), ring = [...pads].sort((a, b) => ang(a) - ang(b));
+    next = ring[(ring.indexOf(cur) + step + ring.length) % ring.length];
+  } else {
+    const [cx, cy] = toScreen(cur.pos);
+    let best = Infinity;
+    for (const p of pads) {
+      if (p === cur) continue;
+      const [x, y] = toScreen(p.pos), along = (x - cx) * dir[0] + (y - cy) * dir[1], side = Math.abs((x - cx) * dir[1] - (y - cy) * dir[0]);
+      if (along > 1 && along + side * 2 < best) { best = along + side * 2; next = p; }
+    }
+  }
+  if (!next) return;
+  select(siteSel(next)); lastSite = next;
+  const [x, y] = toScreen(next.pos);
+  if (Math.abs(x) > innerWidth * .38 || Math.abs(y) > innerHeight * .33) {
+    const s0 = new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target));
+    tween = { t: 0, dur: .6, t0: controls.target.clone(), t1: next.pos.clone(), s0, s1: s0, dth: 0 };
+  }
+}
+const ARROWS = { arrowleft: [-1, 0], arrowright: [1, 0], arrowup: [0, -1], arrowdown: [0, 1] };
+// Capture phase: with a site selected, arrows navigate instead of orbiting the camera (scene.js listens on the canvas).
+addEventListener('keydown', e => {
+  if ((state.phase !== 'build' && state.phase !== 'wave') || e.metaKey || e.ctrlKey || e.altKey) return;
+  const key = e.key.toLowerCase(), onMap = e.target === document.body || e.target === renderer.domElement;
+  if (key === 'tab' && onMap && !state.paused) { e.preventDefault(); keyNav(e.shiftKey ? -1 : 1); }
+  else if (ARROWS[key] && state.selected) { e.preventDefault(); e.stopPropagation(); keyNav(0, ARROWS[key]); }
+}, true);
+
 addEventListener('keydown', e => {
   unlock();
   if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -519,6 +558,10 @@ addEventListener('keydown', e => {
   // Title: Space activates the focused button (choose a card); Enter begins the siege, with the focused difficulty.
   if (state.phase === 'title') {
     const btn = e.target.closest?.('#cd button');
+    if (btn?.dataset.a === 'diff' && (key === 'arrowleft' || key === 'arrowright')) {   // radio group: arrows move the choice
+      const ks = Object.keys(DIFFS), k = ks[(ks.indexOf(btn.dataset.k) + (key === 'arrowright' ? 1 : ks.length - 1)) % ks.length];
+      e.preventDefault(); selectDiff(k); root.querySelector(`.dcard[data-k=${k}]`).focus(); return;
+    }
     if (key === ' ' && btn || key === 'enter' && btn?.dataset.a === 'level') return;
     if (key === 'enter' || key === ' ') { e.preventDefault(); if (btn?.dataset.a === 'diff') selectDiff(btn.dataset.k); startGame(); }
     return;
