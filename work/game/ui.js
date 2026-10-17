@@ -384,7 +384,7 @@ function updateTrails(realDt) {
     m.opacity = THREE.MathUtils.clamp(m.opacity + (on ? realDt : -realDt) * 2, 0, .75);
     tr.pts.visible = m.opacity > 0;
     if (!tr.pts.visible) return;
-    const a = tr.pts.geometry.attributes.position, off = (t * 3) % TRAIL_GAP;
+    const a = tr.pts.geometry.attributes.position, off = reduced ? 0 : (t * 3) % TRAIL_GAP;
     for (let k = 0; k < tr.n; k++) { tr.lane.pointAt(k * TRAIL_GAP + off, tr.v); a.setXYZ(k, tr.v.x, tr.v.y + .6, tr.v.z); }
     a.needsUpdate = true;
   });
@@ -436,7 +436,7 @@ function refreshHud(realDt) {
   const sel = state.selected;
   const hint = sel?.kind === 'pad' ? k(`Hover a tower to preview its reach. Click or press ${KEYS} to build.`, 'Tap a tower to preview it, tap Build to raise it.')
     : sel?.kind === 'tower' && sellArmed ? k('Press <kbd>S</kbd> again to sell, <kbd>Esc</kbd> to keep the tower.', 'Tap Confirm to sell this tower.')
-    : sel?.kind === 'tower' ? k('<kbd>U</kbd> upgrade · <kbd>S</kbd> sell · <kbd>Esc</kbd> close', 'Upgrade or sell this tower. Tap the ground to close.')
+    : sel?.kind === 'tower' ? k(`${towers.upgradeCost(sel.tower) == null ? '' : '<kbd>U</kbd> upgrade · '}<kbd>S</kbd> sell · <kbd>Esc</kbd> close`, 'Upgrade or sell this tower. Tap the ground to close.')
     : !touch && hover?.kind === 'pad' ? `Click to choose a tower, or press ${KEYS} to build one here.`
     : fighting && !state.towers.length ? k('Foes are on the road! Click a stone build site to raise a tower.', 'Foes are on the road! Tap a stone build site to raise a tower.')
     : fighting ? k('Click a tower to upgrade it mid-battle. <kbd>F</kbd> hastens the fight, <kbd>P</kbd> pauses.', 'Tap a tower to upgrade it mid-battle.')
