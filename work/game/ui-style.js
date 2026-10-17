@@ -304,6 +304,12 @@ position:fixed;inset:0;pointer-events:none;font-family:var(--serif);color:var(--
  #cd .card{width:auto;left:8px!important;right:8px;top:auto!important;bottom:calc(env(safe-area-inset-bottom) + 8px);animation:cdSheet .3s cubic-bezier(.2,.9,.3,1)}
  #cd .bm-opt{width:62px;height:62px;margin:-31px 0 0 -31px}
  #cd .dcard{width:31%;min-width:104px;padding:10px 6px}
+ #cd .maps{flex-wrap:nowrap;gap:6px;width:100%}
+ #cd .mapbtn{flex:1;min-width:0;flex-direction:column;gap:3px;padding:7px 4px;text-align:center}
+ #cd .mapbtn .ic{font-size:22px}
+ #cd .mapbtn b{font-size:14px;letter-spacing:.04em}
+ #cd .mapbtn small{display:none}
+ #cd .crest{letter-spacing:.22em}
  #cd .dcard p{display:none}
  #cd .dcard h3{font-size:17px}
  #cd .dcard .m{flex-wrap:wrap;gap:2px 7px;font-size:12px}

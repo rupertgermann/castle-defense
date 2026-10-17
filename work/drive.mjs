@@ -1,5 +1,5 @@
 // Scripted session for UX review: runs a steps file against the built game and saves numbered screenshots.
-// Usage (project root): node work/drive.mjs <steps.mjs> [--size 1440x900] [--level frostmere] [--touch] [--out dir]
+// Usage (project root): node work/drive.mjs <steps.mjs> [--size 1440x900] [--level frostmere] [--touch] [--out dir] [--html name]
 // The steps file default-exports async ({ page, shot, padXY, wait }) => {}.
 import { chromium } from '/Users/rupertgermann/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
 import { pathToFileURL } from 'node:url';
@@ -13,7 +13,7 @@ const errors = [];
 page.on('pageerror', e => errors.push('pageerror: ' + e.message));
 page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') errors.push(m.type() + ': ' + m.text()); });
 const t0 = Date.now();
-await page.goto(pathToFileURL(`${process.cwd()}/outputs/castle-defense.html`).href + (opt('--level') ? `?level=${opt('--level')}` : ''));
+await page.goto(pathToFileURL(`${process.cwd()}/outputs/${opt('--html') || 'castle-defense'}.html`).href + (opt('--level') ? `?level=${opt('--level')}` : ''));
 await page.waitForFunction(() => window.__sceneReady === true, null, { timeout: 120000 });
 console.log('ready in', Date.now() - t0, 'ms');
 const dir = `work/shots/ux/${opt('--out') || 'run'}`;

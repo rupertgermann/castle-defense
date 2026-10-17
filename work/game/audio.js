@@ -85,7 +85,7 @@ function createEngine(c) {
   }
 
   const music = createMusic(c, buses.music, play);
-  const amb = createAmbience(c, buses.amb, play, world.fx.ambient === 'snow');
+  const amb = createAmbience(c, buses.amb, play, world.fx.ambient === 'snow', world.fx.sound === 'surf');
   function setPaused(p) {
     const t = c.currentTime;
     for (const [param, v] of [[buses.sfxPause.gain, p ? 0 : 1], [sfxRev.gain, p ? 0 : 1], [musicLP.frequency, p ? 700 : 18000], [buses.music.gain, vol.music * (p ? .6 : 1)]]) param.setTargetAtTime(v, t, .08);
@@ -202,7 +202,7 @@ function createMusic(c, dest, play) {
 }
 
 // ---------- ambience: wind, river, birds (winter: no river, harder wind, few birds) ----------
-function createAmbience(c, bus, play, winter = false) {
+function createAmbience(c, bus, play, winter = false, sea = false) {
   const dest = c.createGain(); dest.gain.value = .13; dest.connect(bus);   // ambience sits well under everything
   const src = kind => { const s = c.createBufferSource(); s.buffer = noiseBuffer(kind); s.loop = true; s.start(0, Math.random() * 2); return s; };
   const node = (type, f, Q) => { const b = c.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = Q; return b; };
@@ -211,12 +211,16 @@ function createAmbience(c, bus, play, winter = false) {
   const whistleBP = node('bandpass', 900, 14), whistleG = c.createGain(); whistleG.gain.value = 0;
   src('white').connect(whistleBP).connect(whistleG).connect(dest);
   // River: brown-noise body plus babble whose amplitude follows a very slowly played noise buffer.
-  const riverG = c.createGain(); riverG.gain.value = winter ? 0 : .5; riverG.connect(dest);
+  const riverG = c.createGain(); riverG.gain.value = winter || sea ? 0 : .5; riverG.connect(dest);
   src('brown').connect(node('lowpass', 500, .5)).connect(riverG);
   const babble = c.createGain(); babble.gain.value = .06;
   const mod = src('brown'); mod.playbackRate.value = .004; const modG = c.createGain(); modG.gain.value = .12; mod.connect(modG).connect(babble.gain);
   src('white').connect(node('bandpass', 1600, 1.5)).connect(babble).connect(riverG);
-  let nextWind = c.currentTime, nextBird = c.currentTime + 3;
+  // Surf: a low roar that swells as each wave rolls in, with a hiss of foam as it breaks and draws back.
+  const surfG = c.createGain(); surfG.gain.value = 0; surfG.connect(dest);
+  const hissG = c.createGain(); hissG.gain.value = 0; hissG.connect(dest);
+  if (sea) { src('brown').connect(node('lowpass', 420, .4)).connect(surfG); src('white').connect(node('bandpass', 2600, .7)).connect(hissG); }
+  let nextWind = c.currentTime, nextBird = c.currentTime + 3, nextSwell = c.currentTime;
   return {
     schedule(until) {
       const now = c.currentTime;
@@ -228,6 +232,12 @@ function createAmbience(c, bus, play, winter = false) {
         whistleG.gain.linearRampToValueAtTime(Math.random() < (winter ? .6 : .3) ? Math.random() * (winter ? .05 : .03) : 0, t);
         whistleBP.frequency.linearRampToValueAtTime(700 + Math.random() * 700, t);
         nextWind = t;
+      }
+      while (sea && nextSwell < until) {
+        const t0 = Math.max(nextSwell, now), rise = 2.2 + Math.random() * 1.5, fall = 3.5 + Math.random() * 2.5, peak = .55 + Math.random() * .35;
+        surfG.gain.setTargetAtTime(peak, t0, rise / 3); surfG.gain.setTargetAtTime(.12, t0 + rise, fall / 3);
+        hissG.gain.setTargetAtTime(peak * .09, t0 + rise * .8, .25); hissG.gain.setTargetAtTime(0, t0 + rise + .6, fall / 3);
+        nextSwell = t0 + rise + fall * .8;
       }
       while (nextBird < until) {
         const pan = (Math.random() * 2 - 1) * .8;

@@ -617,7 +617,7 @@ function cauldronBody(level) {
 }
 // ---- trebuchet: a counterweight engine on a stone bastion. The arm pivots on the axle; the counterweight hangs
 // from a hinge on the short end and is kept plumb each frame; the boulder rides in the sling at the long end. ----
-export const TREBUCHET = { rest: -2.55, thrown: .6, pivot: 4.6, long: 5.2, short: 1.5 };
+export const TREBUCHET = { rest: -2.35, thrown: .6, pivot: 4.6, long: 5.2, short: 1.5 };
 let boulderGeo;
 export function boulderGeometry() {
   if (boulderGeo) return boulderGeo;
@@ -665,8 +665,8 @@ function trebuchet(scale) {
   return turret;
 }
 function boulderPile(g, x, y, z, n) {
-  const spots = [[0, 0, 0], [.75, 0, .15], [.35, 0, .7], [-.4, 0, .55], [.35, .55, .3], [-.75, 0, -.1], [.9, 0, -.6]];
-  for (let i = 0; i < n; i++) { const [dx, dy, dz] = spots[i]; const m = mesh(boulderGeometry(), mats.rock, g); m.position.set(x + dx, y + .4 + dy, z + dz); m.rotation.set(i, i * 2, 0); m.scale.setScalar(.72); }
+  const spots = [[0, 0, 0], [.48, 0, .1], [.22, 0, .45], [-.26, 0, .35], [.22, .36, .2], [-.48, 0, -.06], [.56, 0, -.38]];
+  for (let i = 0; i < n; i++) { const [dx, dy, dz] = spots[i]; const m = mesh(boulderGeometry(), mats.rock, g); m.position.set(x + dx, y + .28 + dy, z + dz); m.rotation.set(i, i * 2, 0); m.scale.setScalar(.5); }
 }
 function trebuchetBody(level) {
   const g = new THREE.Group(), seg = 14;
@@ -675,7 +675,7 @@ function trebuchetBody(level) {
     C(g, 3.5, 3.85, 1.2, 0, .4, 0, M.base, seg);
     C(g, 3.3, 3.45, 1.1, 0, 1.2, 0, M.stone, seg);
     C(g, 3.5, 3.5, .2, 0, 1.75, 0, mats.plank, seg);
-    boulderPile(g, -2.3, 1.85, -1.4, 4);
+    boulderPile(g, -2.0, 1.85, -1.95, 4);
     for (const x of [-2.6, 2.6]) beam([x, 1.85, -1.8], [x, 3.3, -1.8], .16, M.timber, g);
     return { g, turretY: 1.85, height: 11, trebuchet: 1.0 };
   }
@@ -686,7 +686,7 @@ function trebuchetBody(level) {
     C(g, 3.4, 3.4, .2, 0, 3.15, 0, mats.plank, seg);
     slits(g, 3.4, 1.8, .7, .2, [1, 2, 3]); door(g, -3.5, .95, 1.6, .7);
     rear(3.35, 3.2, Math.PI * .62, Math.PI * 1.38, 6);
-    boulderPile(g, -2.2, 3.25, -1.7, 6); barrels(g, 1.7, 3.25, -2.1, 1);
+    boulderPile(g, -2.05, 3.25, -2.0, 6); barrels(g, 1.95, 3.25, -2.0, 1);
     banner(g, 0, 2.1, 3.58, 1.1, 2.0, 0);
     return { g, turretY: 3.25, height: 13.5, trebuchet: 1.08 };
   }
@@ -699,7 +699,7 @@ function trebuchetBody(level) {
   C(g, 3.6, 3.6, .2, 0, 4.7, 0, mats.plank, seg);
   slits(g, 3.55, 2.8, .9, .22, [1, 2, 3]); door(g, -4.0, 1.0, 1.4, .3);
   rear(3.65, 4.75, Math.PI * .55, Math.PI * 1.45, 8);
-  boulderPile(g, -2.4, 4.8, -1.6, 7); barrels(g, 1.6, 4.8, -2.3, 2);
+  boulderPile(g, -2.15, 4.8, -2.05, 7); barrels(g, 1.75, 4.8, -2.15, 1);
   pennant(g, 3.0, 5.2, -2.0, 2.8); pennant(g, -3.0, 5.2, -2.0, 2.8);
   banner(g, 0, 3.2, 3.75, 1.3, 2.6, 0); banner(g, 3.75, 3.2, 0, 1.3, 2.6, Math.PI / 2); banner(g, -3.75, 3.2, 0, 1.3, 2.6, -Math.PI / 2);
   return { g, turretY: 4.8, height: 16, trebuchet: 1.16 };

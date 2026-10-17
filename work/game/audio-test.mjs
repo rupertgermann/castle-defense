@@ -8,7 +8,7 @@ const page = await browser.newPage();
 const errors = [];
 page.on('pageerror', e => errors.push('pageerror: ' + e.message));
 page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') errors.push(m.type() + ': ' + m.text()); });
-await page.goto(pathToFileURL(`${process.cwd()}/outputs/${name}.html`).href, { timeout: 120000 });
+await page.goto(pathToFileURL(`${process.cwd()}/outputs/${name}.html`).href + (process.argv[3] ? '?level=' + process.argv[3] : ''), { timeout: 120000 });
 await page.waitForFunction(() => window.__sceneReady === true, null, { timeout: 120000 });
 const rows = await page.evaluate(() => __game.audio.debug.report());
 console.log('name'.padEnd(52) + 'var  dur(s)   peak   rms(dBFS)  ok');

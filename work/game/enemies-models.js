@@ -357,11 +357,11 @@ function warlord() {
 // ---- war shaman: black-robed bone-priest with an antler crown and a skull staff that pours green light into the host ----
 function shaman() {
   const m = new Model('shaman', humanBones([['totem', 'armR', [-.27, 2.2, .3]]]), { cap: 40 });
-  const robe = '#2b3a2f', robeLt = '#3d4a3c', heal = '#7dffa8';
+  const robe = '#8c7a55', robeLt = '#a39069', heal = '#7dffa8';
   legs(m, { trouser: robe, boot: C.leatherDk, wraps: C.rope });
   // long robe from the waist to the ankles, split at the front, crimson sash and bone charms
-  m.add('hips', [cyl(.2, .36, .86, 14, [0, .58, 0], 0, 1, true, PI * .58, PI * 1.84), cyl(.2, .2, .1, 14, [0, 1.02, 0])], robe, 'cloth');
-  m.add('hips', [cyl(.365, .37, .07, 14, [0, .17, 0], 0, 1, true, PI * .58, PI * 1.84)], C.crimsonDk, 'cloth');
+  m.add('hips', [cyl(.2, .36, .86, 14, [0, .58, 0]), cyl(.2, .2, .1, 14, [0, 1.02, 0])], robe, 'cloth');
+  m.add('hips', [cyl(.365, .37, .07, 14, [0, .17, 0], 0, 1, true)], '#2f6b4a', 'cloth');
   m.add('hips', [cyl(.215, .215, .09, 14, [0, 1.0, 0], 0, [1, 1, .85]), box(.09, .42, .03, .01, [.06, .78, .2], [-.08, 0, .06])], C.crimson, 'cloth');
   for (let i = 0; i < 5; i++) { const a = -1 + i * .5; m.add('hips', [limb([Math.sin(a) * .21, 1.0, Math.cos(a) * .17], [Math.sin(a) * .23, .86, Math.cos(a) * .19], .006, .006, 3), sph(.025, [Math.sin(a) * .23, .84, Math.cos(a) * .19])], C.bone, 'bone'); }
   // torso: robe, fur mantle, a necklace of finger bones
@@ -400,14 +400,14 @@ function outrider() {
     ['legBR', 'body', [-.2, 1.3, -.6]], ['legBL', 'body', [.2, 1.3, -.6]],
     ['rider', 'body', [0, 1.85, -.05]],
   ], { cap: 60 });
-  const coat = '#3a2a20', coatDk = '#241912', mane = '#141010';
+  const coat = '#6e4a31', coatDk = '#4a3020', mane = '#1c1410';
   // horse: deep chest, barrel, round haunches
   m.add('body', [sph(.4, [0, 1.38, .45], [.9, 1.05, 1.0]), limb([0, 1.38, .4], [0, 1.4, -.45], .4, .4, 12), sph(.42, [0, 1.42, -.55], [.95, 1.02, 1.0])], coat, 'hide');
   m.add('body', [sph(.3, [0, 1.12, 0], [1, .6, 1.6])], coatDk, 'hide');
   // caparison: crimson drape with a black hem and the host's sigil, saddle, iron chanfron on the head below
   m.add('body', [sph(.47, [0, 1.42, -.05], [1.02, 1.0, 1.75], 0, 16, 8, 0, PI * .44)], C.crimson, 'cloth');
   m.add('body', [sph(.475, [0, 1.42, -.05], [1.02, 1.0, 1.75], 0, 16, 2, PI * .42, PI * .06)], C.black, 'cloth');
-  for (const s of [-1, 1]) for (const pts of sigilShapes(1.2)) m.add('body', ext(pts, .012, .004, [s * .47, 1.42, -.1], [0, s * PI / 2, 0]), C.bone, 'bone');
+  for (const s of [-1, 1]) for (const pts of sigilShapes(1.1)) m.add('body', ext(pts, .012, .004, [s * .49, 1.6, -.15], [0, s * PI / 2, 0]), C.bone, 'bone');
   m.add('body', [box(.42, .12, .55, .05, [0, 1.86, -.05]), box(.4, .14, .08, .03, [0, 1.96, .2]), box(.4, .16, .08, .03, [0, 1.98, -.3])], C.leatherDk, 'leather');
   for (const s of [-1, 1]) m.add('body', [limb([s * .22, 1.84, 0], [s * .27, 1.25, .05], .008, .008, 3), tor(.05, .012, [s * .27, 1.2, .05], [0, PI / 2, 0], 1, 4, 8)], C.darkIron, 'iron');
   // neck and head with mane
@@ -431,12 +431,14 @@ function outrider() {
   m.add(r, [box(.36, .46, .25, .09, [0, 2.3, 0]), cyl(.05, .058, .1, 8, [0, 2.55, 0])], C.mail, 'mail');
   m.add(r, [box(.19, .5, .27, .05, [-.09, 2.24, 0])], C.crimson, 'cloth'); m.add(r, [box(.19, .5, .27, .05, [.09, 2.24, 0])], C.black, 'cloth');
   m.add(r, [sph(.1, [0, 2.68, .01], [.92, 1.1, 1])], C.skin, 'skin');
+  m.add(r, [sph(.075, [0, 2.62, .06], [1, .85, .8])], '#3a2618', 'fur');
+  for (const s of [-1, 1]) m.add(r, sph(.013, [s * .034, 2.7, .095], 1, 0, 6, 4), '#15100c', 'skin');
   m.add(r, [cyl(.2, .21, .02, 14, [0, 2.79, 0]), sph(.125, [0, 2.78, 0], 1, 0, 12, 6, 0, PI / 2)], C.steel, 'steel');
   for (const s of [-1, 1]) m.add(r, sph(.12, [s * .25, 2.48, 0], [1, .75, 1]), C.steel, 'steel');
-  m.add(r, [limb([-.25, 2.45, 0], [-.3, 2.2, .1], .055, .045, 7), limb([-.3, 2.2, .1], [-.26, 2.15, .32], .045, .04, 7), limb([.25, 2.45, 0], [.32, 2.2, .1], .055, .045, 7), limb([.32, 2.2, .1], [.34, 2.2, .3], .045, .04, 7)], C.mail, 'mail');
-  m.add(r, [limb([-.24, 2.2, -1.0], [-.24, 2.32, 2.7], .03, .022, 6)], C.wood, 'wood');
-  m.add(r, [cone(.045, .22, 6, [-.24, 2.32, 2.8], [PI / 2, 0, 0]), cyl(.06, .03, .1, 8, [-.24, 2.21, .45], [PI / 2, 0, 0])], C.steel, 'steel');
-  m.add(r, ext([[0, 0], [-.42, -.08], [0, -.2]], .008, .003, [-.24, 2.3, 2.45], [0, PI / 2, 0]), C.crimson, 'cloth');
+  m.add(r, [limb([-.25, 2.45, 0], [-.36, 2.22, .1], .055, .045, 7), limb([-.36, 2.22, .1], [-.42, 2.2, .32], .045, .04, 7), limb([.25, 2.45, 0], [.32, 2.2, .1], .055, .045, 7), limb([.32, 2.2, .1], [.34, 2.2, .3], .045, .04, 7)], C.mail, 'mail');
+  m.add(r, [limb([-.38, 2.18, -1.0], [-.62, 2.34, 2.7], .03, .022, 6)], C.wood, 'wood');
+  m.add(r, [cone(.045, .22, 6, [-.63, 2.35, 2.8], [PI / 2, 0, -.06]), cyl(.06, .03, .1, 8, [-.44, 2.21, .45], [PI / 2, 0, 0])], C.steel, 'steel');
+  m.add(r, ext([[0, 0], [-.42, -.08], [0, -.2]], .008, .003, [-.6, 2.33, 2.45], [0, PI / 2, 0]), C.crimson, 'cloth');
   m.add(r, xf(ext(kiteOutline(.21, .36), .02, .006), [.4, 2.15, .18], [0, PI / 2 - .25, 0]), C.crimson, 'wood');
   for (const pts of sigilShapes(.8)) m.add(r, xf(ext(pts, .012, .004, [0, .05, .016]), [.4, 2.15, .18], [0, PI / 2 - .25, 0]), C.bone, 'bone');
   return m.finish();

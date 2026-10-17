@@ -408,10 +408,9 @@ function crush(p, radius = 4.6) {
 const HEAL = col('#7dffa8', 2.6), HEAL2 = col('#2fb86a', 1.2), HEAL_RING = col('#7dffa8', 1.8);
 function healPulse({ pos, radius, targets }) {
   const g = groundAt(pos.x, pos.z);
-  decal(1, pos.x, g, pos.z, radius * 2, 1.1, 1, HEAL_RING, 1); decal(1, pos.x, g, pos.z, radius * 1.2, .7, .8, HEAL_RING, 1);
-  burst(PR.motes, pos.x, g + 1.8, pos.z, 1.2, 14, 0, 1, 0, HEAL, HEAL2);
-  for (const e of targets || []) burst(PR.motes, e.pos.x, e.pos.y + (e.height || 1.8) * .5, e.pos.z, .9, 6, 0, 1, 0, HEAL, HEAL2);
-  flash(pos, '#7dffa8', 260, .4);
+  decal(1, pos.x, g, pos.z, radius, .6, .35, HEAL_RING, 1);
+  burst(PR.motes, pos.x, g + 1.8, pos.z, 1, 10, 0, 1, 0, HEAL, HEAL2);
+  for (const e of targets || []) burst(PR.motes, e.pos.x, e.pos.y + (e.height || 1.8) * .5, e.pos.z, .8, 5, 0, 1, 0, HEAL, HEAL2);
 }
 function impact(p, id, radius, target, duration) {
   const g = groundAt(p.x, p.z);
