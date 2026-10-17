@@ -133,6 +133,11 @@ export function fortKit(K, BASE, height) {
       for (const xx of [-w * .26, w * .26]) { box(.65, .86, .03, xx, h * .74, side * (d / 2 + .1), materials.dark, group); box(.06, .88, .06, xx, h * .74, side * (d / 2 + .14), materials.timber, group); }
     }
     box(1, 1.8, .06, w * .25, .88, d / 2 + .035, materials.timber, group);
+    for (const side of [-1, 1]) {   // gable-end walls: corner posts, a rail, a shuttered window
+      for (const zz of [-d / 2 + .3, d / 2 - .3]) box(.17, h, .17, side * (w / 2 + .01), h / 2, zz, materials.timber, group);
+      box(.16, .19, d, side * (w / 2 + .01), h * .55, 0, materials.timber, group);
+      box(.03, .8, .62, side * (w / 2 + .1), h * .76, d * .18, materials.dark, group); box(.06, .82, .06, side * (w / 2 + .14), h * .76, d * .18, materials.timber, group);
+    }
     pitchedRoof(w + 1, d + 1, h * .74, 0, h, 0, group);
     box(.85, 3.5, .9, -w * .23, h + 1.65, -d * .2, materials.stone, group);
     box(1.06, .2, 1.11, -w * .23, h + 3.3, -d * .2, materials.trim, group);
