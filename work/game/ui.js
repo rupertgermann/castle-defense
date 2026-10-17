@@ -1,5 +1,5 @@
 // HUD, title/end screens, input + selection, build/upgrade menus, wave flow, camera framing.
-import { THREE, camera, controls, renderer, titleView, fortPoints, laneNames } from '../scene.js';
+import { THREE, scene, camera, controls, renderer, titleView, fortPoints, laneNames } from '../scene.js';
 import { LEVEL, LEVELS, levelInfo, switchLevel } from '../level.js';
 import { state, bus, lanes, gatePoint } from './core.js';
 import * as towers from './towers.js';
@@ -68,7 +68,7 @@ root.innerHTML = `<style>${CSS}</style>${SPRITE}
     <button class="dcard leather" data-a="diff" data-k="${k}" role="radio" aria-label="${d.name}: ${d.desc} ${d.lives} keep strength, ${Math.round(BASE_GOLD * d.gold)} starting gold, foes at ${Math.round(d.hp * 100)}% toughness">${icon(d.icon)}<h3>${d.name}</h3><p>${d.desc}</p>
     <div class="m"><span title="Keep strength">${icon('heart')}${d.lives}</span><span title="Starting gold">${icon('coin')}${Math.round(BASE_GOLD * d.gold)}</span><span title="Foe toughness">${icon('skull')}${Math.round(d.hp * 100)}%</span></div></button>`).join('')}</div>
   <button class="cta" data-a="begin">Defend the Keep</button>
-  <div class="how">Raise towers on the stone build sites beside the roads. Sound the horn early for bonus gold.<span class="desk"><br><kbd>Tab</kbd> / arrows pick a site · <kbd>Space</kbd> horn · ${KEYS} build · <kbd>U</kbd> upgrade · <kbd>S</kbd> sell · <kbd>F</kbd> speed · <kbd>P</kbd> pause</span></div>
+  <div class="how">Raise towers on the stone build sites beside the roads. Sound the horn early for bonus gold.<span class="desk"><br><kbd>Tab</kbd> sites · <kbd>Space</kbd> horn · ${KEYS} build · <kbd>U</kbd> upgrade · <kbd>S</kbd> sell · <kbd>F</kbd> speed · <kbd>P</kbd> pause</span></div>
 </div>
 <div class="screen end" data-r="end"></div>`;
 document.body.appendChild(root);
@@ -366,6 +366,30 @@ function placePins() {
   });
 }
 
+// Route trails: in the build phase, dots drift toward the gate along each road the next wave will take
+// (the Frostmere lake crossing has no visible road at all).
+const TRAIL_GAP = 4.5;
+const trails = lanes.map(lane => {
+  const dot = document.createElement('canvas'); dot.width = dot.height = 32;
+  const g = dot.getContext('2d'); g.fillStyle = '#fff'; g.beginPath(); g.arc(16, 16, 12, 0, 7); g.fill();
+  const n = Math.floor(lane.length / TRAIL_GAP), geo = new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
+  const pts = new THREE.Points(geo, new THREE.PointsMaterial({ map: new THREE.CanvasTexture(dot), color: '#ffd38a', size: 6, sizeAttenuation: false, transparent: true, opacity: 0, depthWrite: false }));
+  pts.frustumCulled = false; pts.visible = false; pts.renderOrder = 5; scene.add(pts);
+  return { lane, pts, n, v: new THREE.Vector3() };
+});
+function updateTrails(realDt) {
+  const t = performance.now() / 1000;
+  trails.forEach((tr, i) => {
+    const on = state.phase === 'build' && !$.pins.children[i].hidden, m = tr.pts.material;
+    m.opacity = THREE.MathUtils.clamp(m.opacity + (on ? realDt : -realDt) * 2, 0, .75);
+    tr.pts.visible = m.opacity > 0;
+    if (!tr.pts.visible) return;
+    const a = tr.pts.geometry.attributes.position, off = (t * 3) % TRAIL_GAP;
+    for (let k = 0; k < tr.n; k++) { tr.lane.pointAt(k * TRAIL_GAP + off, tr.v); a.setXYZ(k, tr.v.x, tr.v.y + .6, tr.v.z); }
+    a.needsUpdate = true;
+  });
+}
+
 // ── HUD refresh ──
 let dispGold = state.gold, lastGold = state.gold, lastLives = state.lives, hudKey = '', hintKey = '';
 function flash(el, cls) { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
@@ -414,6 +438,7 @@ function refreshHud(realDt) {
     : sel?.kind === 'tower' && sellArmed ? k('Press <kbd>S</kbd> again to sell, <kbd>Esc</kbd> to keep the tower.', 'Tap Confirm to sell this tower.')
     : sel?.kind === 'tower' ? k('<kbd>U</kbd> upgrade · <kbd>S</kbd> sell · <kbd>Esc</kbd> close', 'Upgrade or sell this tower. Tap the ground to close.')
     : !touch && hover?.kind === 'pad' ? `Click to choose a tower, or press ${KEYS} to build one here.`
+    : fighting && !state.towers.length ? k('Foes are on the road! Click a stone build site to raise a tower.', 'Foes are on the road! Tap a stone build site to raise a tower.')
     : fighting ? k('Click a tower to upgrade it mid-battle. <kbd>F</kbd> hastens the fight, <kbd>P</kbd> pauses.', 'Tap a tower to upgrade it mid-battle.')
     : countdown != null ? 'Sound the horn early — every second saved is gold for the treasury.'
     : state.towers.length === 0 ? k('Click a stone build site beside the road to raise your first tower.', 'Tap a stone build site beside the road to raise your first tower.')
@@ -620,7 +645,7 @@ export function update(dt, realDt = dt) {
   if (state.phase !== 'title') refreshHud(realDt);
   if (state.selected?.kind === 'tower' && cardKey !== towerKey(state.selected.tower)) renderTower();
   if (state.selected?.kind === 'pad' && preview && cardKey !== preview + (state.gold < TOWERS[preview].levels[0].cost)) showBuildCard(preview);
-  placeAnchored(); placePins();
+  placeAnchored(); placePins(); updateTrails(realDt);
 }
 
 export const debug = {
