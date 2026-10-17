@@ -1,6 +1,6 @@
 // Tower, pad, scaffold and projectile geometry. Built with the castle's own helpers and materials, then baked
 // (merged per material) once per tower type/level; tower instances clone the baked templates (shared geometry).
-import { THREE, materials, stoneMaps, box, cylinder, beam, tiledCone, pitchedRoof, worldUV, mesh } from '../scene.js';
+import { THREE, materials, stoneMaps, box, cylinder, beam, tiledCone, pitchedRoof, worldUV, mesh, world } from '../scene.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const M = materials;
@@ -30,6 +30,8 @@ export const shared = {
   plain: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .95 }),
   metal: new THREE.MeshStandardMaterial({ vertexColors: true, metalness: .72, roughness: .5 }),
 };
+// Winter worlds dust the built towers with snow too.
+if (world.snowify) for (const m of [...Object.values(shared), mats.plank, mats.clay]) world.snowify(m);
 const convert = new Map([
   ...[M.stone, M.trim, M.base].map(m => [m, shared.masonry]),
   ...[M.timber, M.dark, mats.plank, mats.clay, mats.cloth, mats.clothBlue, mats.rope, mats.tunic, mats.hood, mats.leather, mats.skin, mats.string].map(m => [m, shared.plain]),

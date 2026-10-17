@@ -318,12 +318,27 @@ function render(now) {
   const time = (now - start) * .001;
   for (const hook of frameHooks) hook(dt, time);
   controls.update();
+  keepViewClear();
   if (!reducedMotion) world.animate(time);
   composer.render(); frameCount++;
   if (frameCount === 1) { document.body.classList.add('ready'); window.__sceneReady = true; renderer.shadowMap.autoUpdate = false; }
 }
 requestAnimationFrame(render);
 
+// Keep the camera above the ground with a clear line of sight: when the camera half of the camera→target
+// segment dips into a hill, raise the camera just enough (Frostmere's peaks ring the pass). The target half is
+// left alone: overview targets may sit below a plateau on purpose.
+const _seg = new THREE.Vector3();
+function keepViewClear() {
+  const c = camera.position, t = controls.target;
+  let lift = 0;
+  for (let i = 12; i <= 24; i++) {
+    const k = i / 24; _seg.lerpVectors(t, c, k);
+    const need = height(_seg.x, _seg.z) + (i === 24 ? 6 : 3) - _seg.y;
+    if (need > 0) lift = Math.max(lift, need / k);
+  }
+  if (lift > 0) c.y += lift;
+}
 function fit() {
   camera.aspect = innerWidth / innerHeight;
   camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(19.5)) * Math.max(1, 1.1 / camera.aspect)));
