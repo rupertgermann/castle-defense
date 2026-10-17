@@ -35,7 +35,7 @@ const MIX = {
   dum: { max: 4, gap: .02, pj: .02, bus: 'music' },
   tek: { max: 4, gap: .02, pj: .04, bus: 'music' },
 };
-const FIRE = { arrow: 'arrow', bolt: 'bolt', cannonball: 'cannon', arcane: 'arcane', firepot: 'bolt' };
+const FIRE = { arrow: 'arrow', bolt: 'bolt', cannonball: 'cannon', arcane: 'arcane', firepot: 'bolt', boulder: 'bolt' };
 
 const bank = {};              // name → AudioBuffer[]
 let bankReady = null, ctx = null, eng = null, muted = false, mode = null, paused = false;
@@ -255,12 +255,14 @@ export function init() {
   const once = () => { unlock(); removeEventListener('pointerdown', once, true); removeEventListener('keydown', once, true); };
   addEventListener('pointerdown', once, true); addEventListener('keydown', once, true);
 
-  bus.on('tower:fire', ({ tower, from, projectile }) => { const id = FIRE[projId(projectile)]; if (id) sfx(id, { pos: from, rate: 1 - (tower?.level || 0) * .04 }); });
+  bus.on('tower:fire', ({ tower, from, projectile }) => { const pid = projId(projectile), id = FIRE[pid]; if (id) sfx(id, { pos: from, rate: (pid === 'boulder' ? .55 : 1) - (tower?.level || 0) * .04 }); });
   bus.on('projectile:impact', ({ pos, projectile }) => {
     const id = projId(projectile);
     if (id === 'cannonball') sfx('explosion', { pos }); else if (id === 'arcane') sfx('arcaneHit', { pos });
     else if (id === 'firepot') sfx('explosion', { pos, rate: 1.55, gain: .5 });   // pitched-up: a whoomph, not a blast
+    else if (id === 'boulder') sfx('explosion', { pos, rate: .62, gain: 1.15 });   // pitched-down: a ground-shaking thud
   });
+  bus.on('enemy:heal', ({ pos }) => sfx('arcaneHit', { pos, rate: 1.7, gain: .4 }));   // a bright shimmer: something is mending
   bus.on('enemy:hit', ({ enemy, damageType, pos }) => {
     if (damageType === 'blast' || damageType === 'magic' || damageType === 'fire') return;   // explosion / arcane / fire impact already cover these
     sfx(armored(enemy) ? 'hitArmor' : 'hitFlesh', { pos: pos || enemy?.pos });

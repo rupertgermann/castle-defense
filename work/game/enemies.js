@@ -11,6 +11,9 @@ export const ENEMY_TYPES = {
   brute: { name: 'Ogre Brute', hp: 600, speed: 1.8, bounty: 30, damage: 2, armor: .15, radius: 1.2, height: 3.7 },
   ram: { name: 'Battering Ram', hp: 1200, speed: 1.3, bounty: 45, damage: 5, armor: .4, radius: 2.1, height: 3.5 },
   warlord: { name: 'Warlord', hp: 4000, speed: 1.2, bounty: 200, damage: 10, armor: .35, radius: 1.3, height: 4.3, boss: true },
+  // Every few seconds the shaman mends the wounded around it (not itself). Kill it first.
+  shaman: { name: 'War Shaman', tip: 'Mends the wounded around it. Kill it first.', hp: 200, speed: 2.4, bounty: 22, damage: 1, armor: 0, radius: .6, height: 2.9, heal: { every: 3.2, radius: 8, frac: .12, boss: .03 } },
+  outrider: { name: 'Outrider', tip: 'Armoured lancers that ride twice as fast as men on foot.', hp: 280, speed: 4.8, bounty: 18, damage: 2, armor: .35, radius: 1.0, height: 3.6 },
 };
 // Models are authored at true scale (man ≈ 1.85 m) and drawn 1.3× for readability from the aerial camera.
 const SCALE = 1.3;
@@ -22,6 +25,8 @@ const KIND = {
   brute: { w: .9, l: .8, stride: 2.5, lat: 1.0, shadow: [1.5, 1.4], vary: .05 },
   ram: { w: 1.45, l: 3.3, stride: 1.2, lat: .2, shadow: [2.6, 5.6], vary: 0 },
   warlord: { w: .9, l: .8, stride: 2.3, lat: .5, shadow: [1.7, 1.7], vary: 0 },
+  shaman: { w: .5, l: .5, stride: 1.5, lat: 1.2, shadow: [.8, .8], vary: .04 },
+  outrider: { w: .7, l: 1.5, stride: 3.4, lat: 1.0, shadow: [1.0, 2.4], vary: .03 },
 };
 
 let models, material, bars, shadows, nextId = 1;
@@ -225,6 +230,18 @@ function leak(e) {
   bus.emit('enemy:leak', { enemy: e });
 }
 
+// A shaman's pulse mends every wounded ally in reach by a share of its maximum health (bosses barely).
+function heal(e, h, dt) {
+  e.cast = Math.max(0, (e.cast || 0) - dt * 1.4);
+  e.healT = (e.healT ?? h.every * (.4 + Math.random() * .6)) - dt;
+  if (e.healT > 0) return;
+  const near = state.enemies.filter(o => o !== e && o.hp < o.maxHp && (o.pos.x - e.pos.x) ** 2 + (o.pos.z - e.pos.z) ** 2 <= h.radius * h.radius);
+  if (!near.length) { e.healT = .4; return; }
+  for (const o of near) o.hp = Math.min(o.maxHp, o.hp + o.maxHp * (ENEMY_TYPES[o.typeId].boss ? h.boss : h.frac));
+  e.healT = h.every; e.cast = 1;
+  bus.emit('enemy:heal', { enemy: e, pos: e.pos.clone(), radius: h.radius, targets: near });
+}
+
 // ---------------------------------------------------------------- movement
 const _c = new THREE.Vector3();
 function onBridge(x, z) { const b = bridgeDeck; return x > b.x0 - 1 && x < b.x1 + 1 && Math.abs(z - b.z) < b.halfWidth + 1; }
@@ -237,8 +254,8 @@ function place(e, dt) {
   if (!onBridge(x, z) && !onBridge(_c.x, _c.z)) y += THREE.MathUtils.clamp(height(x, z) - height(_c.x, _c.z), -.5, .5);
   if (dt > 0) e.velocity.set(x - e.pos.x, y - e.pos.y, z - e.pos.z).divideScalar(dt);
   e.pos.set(x, y, z);
-  if (e.typeId === 'ram' || e.typeId === 'hound') {
-    const half = e.typeId === 'ram' ? 2.6 : 1.1, y0 = lane.pointAt(e.dist - half, _v).y, y1 = lane.pointAt(e.dist + half, _v).y;
+  if (e.typeId === 'ram' || e.typeId === 'hound' || e.typeId === 'outrider') {
+    const half = e.typeId === 'ram' ? 2.6 : e.typeId === 'outrider' ? 1.4 : 1.1, y0 = lane.pointAt(e.dist - half, _v).y, y1 = lane.pointAt(e.dist + half, _v).y;
     let roll = 0;
     if (e.typeId === 'ram' && !onBridge(x, z)) roll = Math.atan2(height(x + _d.z * 1.4, z - _d.x * 1.4) - height(x - _d.z * 1.4, z + _d.x * 1.4), 2.8);
     const pitch = -Math.atan2(y1 - y0, half * 2), kk = e.yaw === null ? 1 : Math.min(1, dt * 6);
@@ -290,6 +307,7 @@ export function update(dt) {
       e.stagger = Math.max(0, e.stagger - dt * 3);
       e.trail = e.trail > e.hp / e.maxHp ? Math.max(e.hp / e.maxHp, e.trail - dt * .45) : e.hp / e.maxHp;
       if (e.hp < e.maxHp || t.boss) e.barA = Math.min(1, e.barA + dt * 5);
+      if (t.heal) heal(e, t.heal, dt);
       if (e.dist >= lanes[e.lane].length) { leak(e); continue; }
     }
     separate(dt);
@@ -361,6 +379,24 @@ const ANIM = {
     R(m, 'banner', -.05 + .03 * Math.sin(e.phase * 2 + 1), 0, .05 * Math.sin(e.phase + .5));
     hitLean(m, e);
   },
+  shaman(m, e) {
+    const s = gait(m, e.phase, { A: .42, B: .7, S: .1, bob: .045, lean: .14, twist: .06, sway: .02 }), c = e.cast || 0, lift = Math.sin(Math.min(1, c) * PI);
+    R(m, 'armR', -.15 + .1 * s - lift * 1.5, 0, -.1 - lift * .15);   // the staff goes up as the pulse goes out
+    R(m, 'armL', -.35 + .1 * s - lift * .6, 0, .35 + lift * .4);
+    R(m, 'head', -.1 - lift * .25, 0, 0);
+    SC(m, 'totem', 1 + .12 * Math.sin(state.time * 4 + e.seed * 9) + lift * .7);
+    hitLean(m, e);
+  },
+  outrider(m, e) {
+    // a rocking canter: forelegs reach together, hind legs drive together, the body pitches between them
+    const ph = e.phase, s = Math.sin(ph), c = Math.cos(ph);
+    R(m, 'legFR', -.75 * s); R(m, 'legFL', -.75 * Math.sin(ph + .5));
+    R(m, 'legBR', .7 * Math.sin(ph + 2.4)); R(m, 'legBL', .7 * Math.sin(ph + 2.9));
+    R(m, 'body', .07 * c - e.stagger * .15, 0, 0); T(m, 'body', 0, .1 * Math.abs(Math.sin(ph + .6)), 0);
+    R(m, 'neck', -.12 * c + e.stagger * .25, 0, 0);
+    R(m, 'tail', -.2 + .15 * Math.sin(ph * 2), .12 * s, 0);
+    R(m, 'rider', -.08 * c + .05, 0, 0); T(m, 'rider', 0, -.04 * Math.abs(Math.sin(ph + 1.4)), 0);
+  },
   hound(m, e) {
     const ph = e.phase, s = Math.sin(ph);
     R(m, 'body', .1 * Math.sin(ph + .6) - e.stagger * .2, 0, 0);
@@ -413,13 +449,13 @@ function draw(e) {
   if (fall > 0) {
     const big = e.typeId === 'ram';
     if (big) _q2.setFromAxisAngle(_Z, fall * .22 * e.dieSide);
-    else if (e.typeId === 'hound') _q2.setFromAxisAngle(_Z, fall * PI * .5 * e.dieSide);
+    else if (e.typeId === 'hound' || e.typeId === 'outrider') _q2.setFromAxisAngle(_Z, fall * PI * .5 * e.dieSide);
     else if (e.typeId === 'warlord') _q2.setFromAxisAngle(_X, fall * PI * .47);
     else if (e.dieBack) _q2.setFromAxisAngle(_X, -fall * PI * .48);
     else _q2.setFromAxisAngle(_Z, fall * PI * .48 * e.dieSide);
     _q.multiply(_q2);
   }
-  const lift = fall * (e.typeId === 'ram' ? 0 : e.typeId === 'hound' ? .25 : .075 * type.height);
+  const lift = fall * (e.typeId === 'ram' ? 0 : e.typeId === 'hound' ? .25 : e.typeId === 'outrider' ? .55 : .075 * type.height);
   _v.set(e.pos.x, e.pos.y + lift - sink * type.height * .45, e.pos.z);
   _root.compose(_v, _q, _s.setScalar(s));
 
@@ -483,7 +519,7 @@ export const debug = {
   },
   // A mixed column of every type on a lane, starting at dist.
   army(lane = 0, dist = 10) {
-    const order = ['hound', 'hound', 'hound', 'raider', 'raider', 'raider', 'raider', 'manatarms', 'manatarms', 'manatarms', 'brute', 'raider', 'raider', 'ram', 'manatarms', 'manatarms', 'warlord', 'brute', 'raider', 'raider'];
+    const order = ['hound', 'hound', 'hound', 'raider', 'raider', 'raider', 'raider', 'manatarms', 'manatarms', 'manatarms', 'brute', 'raider', 'raider', 'ram', 'manatarms', 'shaman', 'outrider', 'outrider', 'manatarms', 'warlord', 'brute', 'shaman', 'raider', 'raider'];
     let d = dist;
     for (const id of order) { const [e] = debug.spawnMany(id, lane, 1, d); d += ENEMY_TYPES[id].radius * 2.2 + .6; }
   },

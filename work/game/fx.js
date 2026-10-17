@@ -393,12 +393,33 @@ function firepot(p, radius = 3, dur = 4) {
   flash(p, '#ff8a3a', 450 * s, .45);
   shakeAt(p, .12 * s);
 }
+// Trebuchet stone: no fire, just earth and rock thrown up, a dust ring rolling out and a crater left behind.
+function crush(p, radius = 4.6) {
+  const s = Math.max(.9, Math.min(2.4, radius / 3.4)), g = groundAt(p.x, p.z);
+  burst(PR.groundDust, p.x, g + .4, p.z, s * 1.5); burst(PR.groundDust, p.x, g + 1.2, p.z, s);
+  burst(PR.bigSmoke, p.x, g + .8, p.z, s * .7);
+  burst(PR.clods, p.x, g + .3, p.z, s * 1.4);
+  debris(p.x, g + .4, p.z, 18, 13 * Math.sqrt(s), [DEBRIS.dirt, DEBRIS.stone, DEBRIS.stone], .2 * s, .5 * s, 6);
+  decal(1, p.x, g, p.z, radius * 1.6, .9, .7, RING, .35);
+  decal(0, p.x, g, p.z, radius * .75, 18, .85, SCORCH, 0, 1);
+  shakeAt(p, .55 * s);
+}
+// Shaman's pulse: a green ring rolls out over the ground and motes rise from everyone it mended.
+const HEAL = col('#7dffa8', 2.6), HEAL2 = col('#2fb86a', 1.2), HEAL_RING = col('#7dffa8', 1.8);
+function healPulse({ pos, radius, targets }) {
+  const g = groundAt(pos.x, pos.z);
+  decal(1, pos.x, g, pos.z, radius * 2, 1.1, 1, HEAL_RING, 1); decal(1, pos.x, g, pos.z, radius * 1.2, .7, .8, HEAL_RING, 1);
+  burst(PR.motes, pos.x, g + 1.8, pos.z, 1.2, 14, 0, 1, 0, HEAL, HEAL2);
+  for (const e of targets || []) burst(PR.motes, e.pos.x, e.pos.y + (e.height || 1.8) * .5, e.pos.z, .9, 6, 0, 1, 0, HEAL, HEAL2);
+  flash(pos, '#7dffa8', 260, .4);
+}
 function impact(p, id, radius, target, duration) {
   const g = groundAt(p.x, p.z);
   switch (id) {
     case 'cannonball': return explosion(p, radius || 3);
     case 'arcane': return arcane(p, radius || 2.5);
     case 'firepot': return firepot(p, radius || 3, duration || 4);
+    case 'boulder': return crush(p, radius || 4.6);
     case 'arrow':
       burst(PR.puff, p.x, Math.max(p.y, g + .2), p.z, target ? .7 : 1);
       burst(PR.splinter, p.x, p.y, p.z, 1, target ? 3 : 5);
@@ -426,6 +447,7 @@ function towerFire({ tower, from, target, projectile }) {
     case 'bolt': burst(PR.twang, f.x, f.y - .3, f.z); burst(PR.arrowDust, f.x, f.y, f.z, 1, 3, v1.x, v1.y, v1.z); return;
     case 'arcane': burst(PR.charge, f.x, f.y, f.z); burst(PR.chargeIn, f.x, f.y, f.z); return;
     case 'firepot': burst(PR.flameCore, f.x, f.y, f.z, .6); burst(PR.ember, f.x, f.y, f.z, 1, 8); burst(PR.twang, f.x, f.y - 1.5, f.z); return;
+    case 'boulder': { const b = tower?.pos || f; burst(PR.groundDust, b.x, b.y + .3, b.z, 1.2); shakeAt(b, .1); return; }   // the counterweight drops: the platform shudders
     default: burst(PR.arrowDust, f.x, f.y, f.z, 1, 2, v1.x, v1.y, v1.z);
   }
 }
@@ -649,6 +671,7 @@ export function init() {
   bus.on('enemy:hit', enemyHit);
   bus.on('enemy:death', enemyDeath);
   bus.on('enemy:leak', leak);
+  bus.on('enemy:heal', healPulse);
   bus.on('tower:build', d => built(d.tower, false));
   bus.on('tower:upgrade', d => built(d.tower, true));
   bus.on('tower:sell', d => sold(d.tower, d.pos));

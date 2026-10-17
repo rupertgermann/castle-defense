@@ -2,7 +2,7 @@
 import { THREE, scene, camera, renderer, composer, height, clearTrees, bridgeDeck, padSpots } from '../scene.js';
 import { state, bus, lanes } from './core.js';
 import { damageEnemy, enemiesInRadius, ENEMY_TYPES } from './enemies.js';
-import { instantiate, ghost, scaffold, padGeometry, runeTexture, projectileGeometries, poseArcher, poseBallista, glowTexture, renderArchers, liveArchers, MANGONEL } from './towers-models.js';
+import { instantiate, ghost, scaffold, padGeometry, runeTexture, projectileGeometries, poseArcher, poseBallista, glowTexture, renderArchers, liveArchers, MANGONEL, TREBUCHET } from './towers-models.js';
 
 export const TOWER_TYPES = {
   archer: {
@@ -50,6 +50,16 @@ export const TOWER_TYPES = {
       { cost: 110, damage: 10, range: 15, rate: .38, burn: { dps: 16, radius: 3, duration: 4 } },
       { cost: 150, damage: 16, range: 16.5, rate: .42, burn: { dps: 25, radius: 3.5, duration: 4.5 } },
       { cost: 210, damage: 24, range: 18, rate: .46, burn: { dps: 38, radius: 4.2, duration: 5 } },
+    ],
+  },
+  // Long-range siege: the biggest splash in the game, but the arm can't drop a stone at the foot of its own bastion.
+  trebuchet: {
+    name: 'Trebuchet', damageType: 'blast', projectile: 'boulder',
+    description: 'A counterweight engine that hurls boulders across the field, crushing whole ranks. It cannot strike foes close to its own walls.',
+    levels: [
+      { cost: 170, damage: 70, range: 34, minRange: 11, rate: .25, splash: 4.6 },
+      { cost: 215, damage: 115, range: 37, minRange: 11, rate: .28, splash: 5.3 },
+      { cost: 290, damage: 175, range: 40, minRange: 11, rate: .31, splash: 6.2 },
     ],
   },
 };
@@ -169,14 +179,14 @@ export function setHighlight(selection, previewTypeId) {
   if (!selection) return;
   const pad = selection.kind === 'pad' ? selection.pad : selection.tower.pad;
   pad._.glowTarget = selection.kind === 'tower' ? .9 : .75;
-  let range = null, color = '#ffd38a';
+  let lv = null, color = '#ffd38a';
   if (selection.kind === 'tower') {
-    const t = selection.tower; range = t.range;
-    if (previewTypeId && upgradeCost(t) != null) { range = TOWER_TYPES[t.typeId].levels[t.level + 1].range; showGhost(t.typeId, t.level + 1, pad); color = '#bfe0ff'; }
+    const t = selection.tower; lv = stat(t);
+    if (previewTypeId && upgradeCost(t) != null) { lv = TOWER_TYPES[t.typeId].levels[t.level + 1]; showGhost(t.typeId, t.level + 1, pad); color = '#bfe0ff'; }
   } else if (previewTypeId && TOWER_TYPES[previewTypeId]) {
-    range = TOWER_TYPES[previewTypeId].levels[0].range; showGhost(previewTypeId, 0, pad); color = '#bfe0ff';
+    lv = TOWER_TYPES[previewTypeId].levels[0]; showGhost(previewTypeId, 0, pad); color = '#bfe0ff';
   }
-  if (range) showRange(pad.pos, range, color);
+  if (lv) showRange(pad.pos, lv.range, color, lv.minRange);
 }
 
 // ---------------- models & animation ----------------
@@ -232,22 +242,29 @@ function showGhost(type, level, pad) {
 function makeRangeRing() {
   const mat = new THREE.ShaderMaterial({
     transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -6,
-    uniforms: { color: { value: new THREE.Color('#ffd38a') }, time: { value: 0 }, opacity: { value: 1 } },
+    uniforms: { color: { value: new THREE.Color('#ffd38a') }, time: { value: 0 }, opacity: { value: 1 }, inner: { value: 0 } },
     vertexShader: 'attribute float rr; attribute float aa; varying float vR; varying float vA; void main(){ vR=rr; vA=aa; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }',
-    fragmentShader: `uniform vec3 color; uniform float time, opacity; varying float vR; varying float vA;
+    fragmentShader: `uniform vec3 color; uniform float time, opacity, inner; varying float vR; varying float vA;
       void main(){
         float edge = smoothstep(.955,.982,vR) * (1. - smoothstep(.992,1.,vR));
         float ticks = step(.55, fract(vA * 40. / 6.2831853 - time * .15)) * smoothstep(.925,.935,vR) * (1. - smoothstep(.95,.958,vR));
         float fill = .03 + .06 * smoothstep(.4, .97, vR);
-        gl_FragColor = vec4(color * (1. + edge * .6), (edge * .9 + ticks * .5 + fill) * opacity);
+        vec3 c = color * (1. + edge * .6); float a = edge * .9 + ticks * .5 + fill;
+        if (inner > 0.) {   // dead zone: a dashed red rim and a faint red wash the engine can't reach
+          float rim = smoothstep(inner - .025, inner - .008, vR) * (1. - smoothstep(inner - .008, inner, vR)) * step(.5, fract(vA * 24. / 6.2831853));
+          float dead = 1. - smoothstep(inner - .01, inner, vR);
+          c = mix(c, vec3(1., .35, .25), max(rim, dead)); a = mix(a, .1, dead) + rim * .8;
+        }
+        gl_FragColor = vec4(c, a * opacity);
       }`,
   });
   const m = new THREE.Mesh(new THREE.BufferGeometry(), mat); m.visible = false; m.renderOrder = 3; m.frustumCulled = false; scene.add(m);
   return m;
 }
-function showRange(center, range, color) {
+function showRange(center, range, color, minRange = 0) {
   const key = center.x + ',' + center.z + ',' + range;
   rangeRing.material.uniforms.color.value.set(color);
+  rangeRing.material.uniforms.inner.value = minRange / range;
   rangeRing.visible = true;
   if (rangeRing.userData.key === key) return;
   rangeRing.userData.key = key;
@@ -268,7 +285,7 @@ function showRange(center, range, color) {
 const laneOf = e => typeof e.lane === 'number' ? lanes[e.lane] : e.lane;
 const remaining = e => { const l = laneOf(e); return (l ? l.length : 0) - (e.dist || 0); };
 const aimPoint = (e, out) => out.copy(e.pos).setY(e.pos.y + (e.height || 1.6) * .6);
-function inRange(tower, e) { return e.alive && Math.hypot(e.pos.x - tower.pos.x, e.pos.z - tower.pos.z) <= tower.range; }
+function inRange(tower, e) { const d = Math.hypot(e.pos.x - tower.pos.x, e.pos.z - tower.pos.z); return e.alive && d <= tower.range && d >= (stat(tower).minRange || 0); }
 function acquire(tower) {
   let best = null, bestR = Infinity;
   for (const e of state.enemies) if (inRange(tower, e)) { const r = remaining(e); if (r < bestR) { bestR = r; best = e; } }
@@ -282,10 +299,10 @@ function lead(from, e, flightTime, out) {
   return T;
 }
 const FLIGHT = {
-  arrow: d => .22 + d / 42, cannonball: d => .5 + d / 26, bolt: d => .05 + d / 85, arcane: d => d / 20, firepot: d => .8 + d / 22,
+  arrow: d => .22 + d / 42, cannonball: d => .5 + d / 26, bolt: d => .05 + d / 85, arcane: d => d / 20, firepot: d => .8 + d / 22, boulder: d => 1.5 + d / 24,
 };
-const GRAV = { arrow: 22, cannonball: 20, bolt: 4, firepot: 22 };
-const TURN = { archer: 7, cannon: 2.2, ballista: 3, mage: 99, cauldron: 2.4 };
+const GRAV = { arrow: 22, cannonball: 20, bolt: 4, firepot: 22, boulder: 20 };
+const TURN = { archer: 7, cannon: 2.2, ballista: 3, mage: 99, cauldron: 2.4, trebuchet: 1.1 };
 
 function angleDiff(a, b) { let d = (b - a) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return d; }
 const aimTmp = new THREE.Vector3(), fromTmp = new THREE.Vector3();
@@ -354,6 +371,14 @@ function idle(tower, dt, engaged) {
     m.arm.rotation.x = rest + (thrown - rest) * k + (since < .45 && _.fired ? Math.sin(since * 40) * .04 * (1 - since / .45) : 0);
     m.pot.visible = !_.fired || k < .05;
   }
+  if (m.tarm) {
+    const period = 1 / s.rate, since = period - Math.max(0, _.cooldown), { rest, thrown } = TREBUCHET;
+    const k = _.cooldown <= 0 || !_.fired ? 0 : since < .5 ? 1 - (1 - since / .5) ** 3 : since < 1.1 ? 1 : Math.max(0, 1 - (since - 1.1) / Math.max(.6, period - 1.6));
+    const sway = since > .5 && since < 1.6 && _.fired ? Math.sin((since - .5) * 9) * .06 * (1 - (since - .5) / 1.1) : 0;
+    m.tarm.rotation.x = rest + (thrown - rest) * k + sway;
+    m.cw.rotation.x = -m.tarm.rotation.x + Math.sin(since * 7) * .25 * Math.max(0, 1 - since / 1.4) * (_.fired ? 1 : 0);   // the weight swings on its hinge
+    m.stone.visible = !_.fired || k < .02;
+  }
   if (m.fire) {
     const f = .8 + .12 * Math.sin(_.t * 9.1) + .08 * Math.sin(_.t * 23.7 + 1) + .1 * Math.sin(_.t * 3.3);
     m.fire.material.opacity = .42 * f; m.fire.scale.setScalar(m.fire.userData.size * (.9 + .15 * f));
@@ -383,6 +408,7 @@ function makeProjectiles() {
     arrow: new THREE.InstancedMesh(geo.arrow, new THREE.MeshStandardMaterial({ color: '#b9a57e', roughness: .8 }), 400),
     bolt: new THREE.InstancedMesh(geo.bolt, new THREE.MeshStandardMaterial({ color: '#5a4630', roughness: .7, metalness: .2 }), 80),
     cannonball: new THREE.InstancedMesh(geo.ball, new THREE.MeshStandardMaterial({ color: '#2a2b28', metalness: .5, roughness: .5 }), 120),
+    boulder: new THREE.InstancedMesh(geo.boulder, new THREE.MeshStandardMaterial({ color: '#8e877a', roughness: 1 }), 40),
     firepot: new THREE.InstancedMesh(geo.pot, new THREE.MeshStandardMaterial({ color: '#7d5236', roughness: .9, emissive: '#ff5a18', emissiveIntensity: .35 }), 60),
     arcane: new THREE.InstancedMesh(geo.orb, orbMat, 1200),
   };
@@ -395,14 +421,16 @@ function fire(tower, target) {
   const from = muzzleWorld(tower, new THREE.Vector3());
   const to = new THREE.Vector3(), T = lead(from, target, FLIGHT[kind], to);
   const p = { kind, tower, target, from, to, T, t: 0, pos: from.clone(), prev: from.clone(), vel: new THREE.Vector3(), damage: s.damage, splash: s.splash || 0, slow: s.slow || null, armorPierce: s.armorPierce || 0, burn: s.burn || null, trail: [] };
-  if (kind === 'cannonball' || kind === 'firepot') to.y -= (target.height || 1.6) * .6;
+  if (kind === 'cannonball' || kind === 'firepot' || kind === 'boulder') to.y -= (target.height || 1.6) * .6;
   if (kind === 'arcane') { p.vel.subVectors(to, from).normalize().multiplyScalar(9).y += 7; p.T = 3.5; p.wob = Math.random() * 6; }
   else ballisticVelocity(from, to, T, GRAV[kind], p.vel);
   p.v0 = p.vel.clone();
   projectiles.list.push(p);
   if (m(tower).archers) { _.shooter++; }
   if (kind === 'cannonball') _.recoil = 1;
-  if (kind === 'firepot') _.fired = true;
+  if (kind === 'firepot' || kind === 'boulder') _.fired = true;
+  if (kind === 'boulder') p.wait = .3;   // leaves the sling as the arm reaches its release point
+  if (kind === 'boulder') p.spin = new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5).normalize();
   if (kind === 'arcane') _.flare = 1;
   bus.emit('tower:fire', { tower, from: from.clone(), target, projectile: kind });
 }
@@ -411,7 +439,9 @@ const impactTmp = new THREE.Vector3();
 function updateProjectiles(dt) {
   const L = projectiles.list;
   for (let i = L.length - 1; i >= 0; i--) {
-    const p = L[i]; p.t += dt; p.prev.copy(p.pos);
+    const p = L[i];
+    if (p.wait > 0) { p.wait -= dt; continue; }
+    p.t += dt; p.prev.copy(p.pos);
     let done = false;
     if (p.kind === 'arcane') {
       const alive = p.target && p.target.alive;
@@ -427,7 +457,7 @@ function updateProjectiles(dt) {
       const g = GRAV[p.kind], t = Math.min(p.t, p.T);
       p.pos.copy(p.from).addScaledVector(p.v0, t); p.pos.y -= .5 * g * t * t;
       // arrows and bolts steer onto the live target so leading errors never read as misses
-      if (p.kind !== 'cannonball' && p.target && p.target.alive) { aimPoint(p.target, tmp); tmp.sub(p.to); p.pos.addScaledVector(tmp, (t / p.T) ** 2); }
+      if (p.kind !== 'cannonball' && p.kind !== 'boulder' && p.target && p.target.alive) { aimPoint(p.target, tmp); tmp.sub(p.to); p.pos.addScaledVector(tmp, (t / p.T) ** 2); }
       if (p.t >= p.T) done = true;
     }
     p.vel.subVectors(p.pos, p.prev);
@@ -436,8 +466,9 @@ function updateProjectiles(dt) {
   }
   // render pools
   const { pools, dummy, color } = projectiles;
-  const counts = { arrow: 0, bolt: 0, cannonball: 0, arcane: 0, firepot: 0 };
+  const counts = { arrow: 0, bolt: 0, cannonball: 0, arcane: 0, firepot: 0, boulder: 0 };
   for (const p of L) {
+    if (p.wait > 0) continue;
     const pool = pools[p.kind];
     if (p.kind === 'firepot') // burning wick: a short ember trail drawn with the additive orb pool
       for (let k = 0; k < p.trail.length && counts.arcane < 1200; k++) {
@@ -460,6 +491,7 @@ function updateProjectiles(dt) {
     if (p.vel.lengthSq() > 1e-8) dummy.quaternion.setFromUnitVectors(_zAxis, tmp.copy(p.vel).normalize()); else dummy.quaternion.identity();
     dummy.scale.setScalar(p.kind === 'arrow' ? 1.6 : p.kind === 'cannonball' ? 1.15 : 1.1);
     if (p.kind === 'firepot') dummy.quaternion.setFromAxisAngle(_zAxis, p.t * 9);
+    if (p.kind === 'boulder') { dummy.quaternion.setFromAxisAngle(p.spin, p.t * 5); dummy.scale.setScalar(1); }
     dummy.updateMatrix(); pool.setMatrixAt(counts[p.kind]++, dummy.matrix);
   }
   for (const k in pools) { pools[k].count = counts[k]; pools[k].instanceMatrix.needsUpdate = true; if (pools[k].instanceColor) pools[k].instanceColor.needsUpdate = true; }
@@ -477,7 +509,7 @@ function impact(p) {
     bus.emit('projectile:impact', { pos, projectile: p.kind, radius, target: p.target, duration: b.duration });
     return;
   }
-  if (p.kind === 'cannonball') {
+  if (p.kind === 'cannonball' || p.kind === 'boulder') {
     radius = p.splash;
     pos.y = Math.max(pos.y, groundY(pos.x, pos.z));
     for (const e of enemiesInRadius(pos, p.splash)) {

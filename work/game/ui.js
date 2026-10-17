@@ -77,7 +77,7 @@ for (const el of root.querySelectorAll('[data-r]')) $[el.dataset.r] = el;
 
 // ── Flow state ──
 let diffKey = 'knight', countdown = null, sched = [], si = 0, waveT = 0, muted = localStorage.getItem('cd-muted') === '1';
-const stats = { slain: 0, earned: 0, built: 0, leaks: lanes.map(() => 0) };
+const stats = { slain: 0, earned: 0, built: 0, leaks: lanes.map(() => 0) }, seen = new Set();
 let hover = null, hoverXY = null, preview = null, lastPointer = 'mouse';
 
 function selectDiff(k) {
@@ -109,7 +109,11 @@ function callWave() {
   sched = schedule(state.wave); si = 0; waveT = 0;
   const w = WAVES[state.wave - 1];
   bus.emit('wave:start', { wave: state.wave });
-  banner(`Wave ${state.wave} of ${WAVES.length}`, w.name, bonus ? `${icon('coin')} +${bonus} for sounding the horn early` : w.boss ? 'A champion leads this host' : '', w.boss);
+  // A foe type that hasn't marched before (and has a trait worth knowing) gets named in the banner.
+  const fresh = composition(state.wave).map(c => c.type).find(t => !seen.has(t) && enemies.ENEMY_TYPES[t].tip);
+  for (const c of composition(state.wave)) seen.add(c.type);
+  const sub = fresh ? `${icon(fresh)} New foe: ${enemyName(fresh)}. ${enemies.ENEMY_TYPES[fresh].tip}` : bonus ? `${icon('coin')} +${bonus} for sounding the horn early` : w.boss ? 'A champion leads this host' : '';
+  banner(`Wave ${state.wave} of ${WAVES.length}`, w.name, sub, w.boss);
 }
 
 function waveClear() {
@@ -272,7 +276,7 @@ function refreshAfford() {
 }
 const statRows = (L, N) => [['dmg', 'Damage', L.damage, N?.damage, 0], ['range', 'Range', L.range, N?.range, 0, ' m'], ['rate', 'Rate', L.rate, N?.rate, 2, '/s']]
   .map(([ic, k, v, nv, dp, u = '']) => `${icon(ic)}<span>${k}</span><b>${+(+v).toFixed(dp)}${u}${nv != null && nv !== v ? `<em>▲ ${+(nv - v).toFixed(dp)}</em>` : ''}</b>`).join('')
-  + (L.splash ? `${icon('blast')}<span>Splash</span><b>${L.splash} m</b>` : '') + (L.slow ? `${icon('magic')}<span>Slows</span><b>${Math.round((1 - L.slow.factor) * 100)}%</b>` : '')
+  + (L.splash ? `${icon('blast')}<span>Splash</span><b>${L.splash} m</b>` : '') + (L.minRange ? `${icon('range')}<span>Dead zone</span><b>under ${L.minRange} m</b>` : '') + (L.slow ? `${icon('magic')}<span>Slows</span><b>${Math.round((1 - L.slow.factor) * 100)}%</b>` : '')
   + (L.burn ? `${icon('fire')}<span>Burns</span><b>${L.burn.dps}/s · ${L.burn.duration} s${N?.burn && N.burn.dps !== L.burn.dps ? `<em>▲ ${N.burn.dps - L.burn.dps}</em>` : ''}</b>` : '');
 const cardHead = (id, def, extra = '', closable = true) => `<div class="card-h"><span class="med">${icon(id)}</span><div><div class="nm">${def.name}</div>
   <div class="dt ${def.damageType}">${icon(def.damageType in DTYPE ? def.damageType : 'pierce')}${DTYPE[def.damageType] || def.damageType || ''} damage</div>${extra}</div>

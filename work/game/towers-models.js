@@ -20,6 +20,7 @@ export const mats = {
   clay: new THREE.MeshStandardMaterial({ color: '#8d5f3e', roughness: .9 }),
   coal: new THREE.MeshStandardMaterial({ color: '#2a160c', roughness: 1, emissive: '#ff4a10', emissiveIntensity: 1.5 }),
   pitch: new THREE.MeshStandardMaterial({ color: '#140e09', roughness: .25, emissive: '#ff6a1c', emissiveIntensity: .55 }),
+  rock: new THREE.MeshStandardMaterial({ color: '#8e877a', roughness: 1 }),
   crystal: new THREE.MeshStandardMaterial({ color: '#bcd3ff', roughness: .18, metalness: .05, emissive: '#6f98ff', emissiveIntensity: 1.1, flatShading: true }),
 };
 
@@ -34,7 +35,7 @@ export const shared = {
 if (world.snowify) for (const m of [...Object.values(shared), mats.plank, mats.clay]) world.snowify(m);
 const convert = new Map([
   ...[M.stone, M.trim, M.base].map(m => [m, shared.masonry]),
-  ...[M.timber, M.dark, mats.plank, mats.clay, mats.cloth, mats.clothBlue, mats.rope, mats.tunic, mats.hood, mats.leather, mats.skin, mats.string].map(m => [m, shared.plain]),
+  ...[M.timber, M.dark, mats.plank, mats.clay, mats.rock, mats.cloth, mats.clothBlue, mats.rope, mats.tunic, mats.hood, mats.leather, mats.skin, mats.string].map(m => [m, shared.plain]),
   ...[M.iron, mats.bronze, mats.gold].map(m => [m, shared.metal]),
 ]);
 // Merge every mesh in `group` per (shared) material into a few meshes. Returns a new Group.
@@ -614,7 +615,96 @@ function cauldronBody(level) {
   banner(g, 0, 6.9, 3.22, 1.3, 3.2, 0); banner(g, 3.22, 6.9, 0, 1.3, 3.2, Math.PI / 2);
   return { g, turretY: 8.1, height: 13.5, mangonel: 1.3, fire: c };
 }
-const bodies = { archer: archerBody, cannon: cannonBody, mage: mageBody, ballista: ballistaBody, cauldron: cauldronBody };
+// ---- trebuchet: a counterweight engine on a stone bastion. The arm pivots on the axle; the counterweight hangs
+// from a hinge on the short end and is kept plumb each frame; the boulder rides in the sling at the long end. ----
+export const TREBUCHET = { rest: -2.55, thrown: .6, pivot: 4.6, long: 5.2, short: 1.5 };
+let boulderGeo;
+export function boulderGeometry() {
+  if (boulderGeo) return boulderGeo;
+  boulderGeo = new THREE.IcosahedronGeometry(.55, 1); const p = boulderGeo.attributes.position;
+  for (let i = 0; i < p.count; i++) { const f = .82 + .3 * Math.abs(Math.sin(p.getX(i) * 7.1 + p.getY(i) * 3.3) * Math.cos(p.getZ(i) * 5.7)); p.setXYZ(i, p.getX(i) * f, p.getY(i) * f * .9, p.getZ(i) * f); }
+  boulderGeo.computeVertexNormals(); return boulderGeo;
+}
+function trebuchet(scale) {
+  const { pivot, long, short } = TREBUCHET, t = new THREE.Group();
+  C(t, 2.7, 2.8, .18, 0, .09, 0, mats.plank, 20);                                   // turntable
+  for (const x of [-1.0, 1.0]) {
+    beam([x, .2, -2.4], [x, .2, 2.4], .3, mats.plank, t);                             // sills
+    beam([x, .2, -2.2], [x, pivot, 0], .26, mats.plank, t);                            // A-frame legs up to the axle
+    beam([x, .2, 2.2], [x, pivot, 0], .26, mats.plank, t);
+    beam([x, 1.9, -1.4], [x, 1.9, 1.4], .2, mats.plank, t);                            // tie beam
+    B(t, .36, .4, .4, x, pivot, 0, M.iron);                                          // axle bearing
+    for (const z of [-2.2, 2.2]) B(t, .4, .12, .4, x, .38, z, M.iron);
+  }
+  for (const z of [-2.4, 2.4]) beam([-1.15, .2, z], [1.15, .2, z], .28, mats.plank, t);
+  beam([-1.0, .2, -2.2], [1.0, 1.9, -1.4], .14, mats.plank, t); beam([1.0, .2, -2.2], [-1.0, 1.9, -1.4], .14, mats.plank, t);   // cross bracing
+  C(t, .13, .13, 2.5, 0, pivot, 0, M.iron, 8).rotation.z = Math.PI / 2;             // axle
+  // windlass at the back that hauls the arm down
+  C(t, .1, .1, 1.7, 0, .75, -1.9, M.iron, 6).rotation.z = Math.PI / 2;
+  for (const x of [-.7, .7]) { const w = C(t, .55, .55, .1, x, .75, -1.9, mats.plank, 12); w.rotation.z = Math.PI / 2; for (let k = 0; k < 4; k++) { const sp = B(t, .08, 1.3, .08, x, .75, -1.9, mats.plank); sp.rotation.x = k * Math.PI / 4; } }
+  const turret = bake(t, false);
+  // throwing arm: long end along +y from the axle, short end along -y
+  const armG = new THREE.Group();
+  B(armG, .3, long + short, .34, 0, (long - short) / 2, 0, mats.plank);
+  for (const y of [-short + .2, -.4, .5, 1.8, 3.2]) B(armG, .36, .1, .4, 0, y, 0, M.iron);
+  beam([0, long - .1, 0], [0, long + .5, .35], .07, mats.rope, armG);                 // sling cord
+  C(armG, .34, .25, .18, 0, long + .55, .38, mats.leather, 10);                     // pouch
+  const arm = new THREE.Group(); arm.position.set(0, pivot, 0); arm.add(bake(armG, false)); arm.name = 'tarm';
+  const cw = new THREE.Group(); cw.position.set(0, -short, 0); cw.name = 'cw';
+  const cwG = new THREE.Group();
+  for (const x of [-.55, .55]) beam([x, 0, 0], [x * 1.25, -.75, 0], .1, M.iron, cwG);
+  B(cwG, 1.45, 1.25, 1.35, 0, -1.35, 0, mats.plank);
+  for (const y of [-.85, -1.85]) B(cwG, 1.5, .1, 1.4, 0, y, 0, M.iron);
+  for (let k = 0; k < 7; k++) { const st = mesh(boulderGeometry(), mats.rock, cwG); st.position.set(-.4 + (k % 3) * .4, -.66, -.35 + Math.floor(k / 3) * .35); st.scale.setScalar(.36); }
+  cw.add(bake(cwG, false)); arm.add(cw);
+  const stone = mesh(boulderGeometry(), mats.rock, arm); stone.position.set(0, long + .62, .38); stone.scale.setScalar(.85); stone.name = 'stone'; stone.castShadow = false;
+  arm.rotation.x = TREBUCHET.rest; cw.rotation.x = -TREBUCHET.rest; turret.add(arm);
+  // release point: the sling end as the arm passes ~12° past vertical
+  const muzzle = new THREE.Object3D(); muzzle.position.set(0, pivot + (long + .6) * Math.cos(.2), (long + .6) * Math.sin(.2)); muzzle.name = 'muzzle'; turret.add(muzzle);
+  turret.scale.setScalar(scale);
+  return turret;
+}
+function boulderPile(g, x, y, z, n) {
+  const spots = [[0, 0, 0], [.75, 0, .15], [.35, 0, .7], [-.4, 0, .55], [.35, .55, .3], [-.75, 0, -.1], [.9, 0, -.6]];
+  for (let i = 0; i < n; i++) { const [dx, dy, dz] = spots[i]; const m = mesh(boulderGeometry(), mats.rock, g); m.position.set(x + dx, y + .4 + dy, z + dz); m.rotation.set(i, i * 2, 0); m.scale.setScalar(.72); }
+}
+function trebuchetBody(level) {
+  const g = new THREE.Group(), seg = 14;
+  const rear = (r, y, from, to, n) => { for (let i = 0; i <= n; i++) { const a = from + (to - from) * i / n; B(g, .9, .8, .6, Math.sin(a) * r, y + .4, Math.cos(a) * r, M.trim, a); } };
+  if (level === 0) {
+    C(g, 3.5, 3.85, 1.2, 0, .4, 0, M.base, seg);
+    C(g, 3.3, 3.45, 1.1, 0, 1.2, 0, M.stone, seg);
+    C(g, 3.5, 3.5, .2, 0, 1.75, 0, mats.plank, seg);
+    boulderPile(g, -2.3, 1.85, -1.4, 4);
+    for (const x of [-2.6, 2.6]) beam([x, 1.85, -1.8], [x, 3.3, -1.8], .16, M.timber, g);
+    return { g, turretY: 1.85, height: 11, trebuchet: 1.0 };
+  }
+  if (level === 1) {
+    C(g, 3.6, 4.0, 1.4, 0, .5, 0, M.base, seg);
+    C(g, 3.35, 3.55, 2.2, 0, 2.1, 0, M.stone, seg);
+    C(g, 3.65, 3.65, .26, 0, 3.0, 0, M.trim, seg);
+    C(g, 3.4, 3.4, .2, 0, 3.15, 0, mats.plank, seg);
+    slits(g, 3.4, 1.8, .7, .2, [1, 2, 3]); door(g, -3.5, .95, 1.6, .7);
+    rear(3.35, 3.2, Math.PI * .62, Math.PI * 1.38, 6);
+    boulderPile(g, -2.2, 3.25, -1.7, 6); barrels(g, 1.7, 3.25, -2.1, 1);
+    banner(g, 0, 2.1, 3.58, 1.1, 2.0, 0);
+    return { g, turretY: 3.25, height: 13.5, trebuchet: 1.08 };
+  }
+  C(g, 3.8, 4.25, 2.0, 0, .75, 0, M.base, seg);
+  for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3 + Math.PI / 6; B(g, 1, 2.6, 1.1, Math.sin(a) * 3.8, 1.0, Math.cos(a) * 3.8, M.base, a); }
+  C(g, 3.5, 3.7, 3.0, 0, 3.0, 0, M.stone, seg);
+  C(g, 3.75, 3.75, .25, 0, 2.0, 0, M.trim, seg);
+  corbels(g, 18, 3.55, 4.25, M.trim, 1.05);
+  C(g, 3.95, 3.95, .3, 0, 4.6, 0, M.trim, seg);
+  C(g, 3.6, 3.6, .2, 0, 4.7, 0, mats.plank, seg);
+  slits(g, 3.55, 2.8, .9, .22, [1, 2, 3]); door(g, -4.0, 1.0, 1.4, .3);
+  rear(3.65, 4.75, Math.PI * .55, Math.PI * 1.45, 8);
+  boulderPile(g, -2.4, 4.8, -1.6, 7); barrels(g, 1.6, 4.8, -2.3, 2);
+  pennant(g, 3.0, 5.2, -2.0, 2.8); pennant(g, -3.0, 5.2, -2.0, 2.8);
+  banner(g, 0, 3.2, 3.75, 1.3, 2.6, 0); banner(g, 3.75, 3.2, 0, 1.3, 2.6, Math.PI / 2); banner(g, -3.75, 3.2, 0, 1.3, 2.6, -Math.PI / 2);
+  return { g, turretY: 4.8, height: 16, trebuchet: 1.16 };
+}
+const bodies = { archer: archerBody, cannon: cannonBody, mage: mageBody, ballista: ballistaBody, cauldron: cauldronBody, trebuchet: trebuchetBody };
 
 // Template: baked body + unbaked weapon template. instantiate() clones it for a tower.
 const templates = new Map();
@@ -634,6 +724,7 @@ export function instantiate(type, level, isGhost = false) {
   if (spec.cannon) { const t = cannon(...spec.cannon); t.position.y = spec.turretY; root.add(t); parts.turret = t; parts.pitch = t.getObjectByName('pitch'); parts.barrel = t.getObjectByName('barrel'); parts.muzzle = t.getObjectByName('muzzle'); }
   if (spec.ballista) { const t = ballista(spec.ballista); t.position.y = spec.turretY; root.add(t); parts.turret = t; parts.muzzle = t.getObjectByName('muzzle'); poseBallista(t, 1, true); }
   if (spec.mangonel) { const t = mangonel(spec.mangonel); t.position.y = spec.turretY; root.add(t); parts.turret = t; parts.arm = t.getObjectByName('arm'); parts.pot = t.getObjectByName('pot'); parts.muzzle = t.getObjectByName('muzzle'); }
+  if (spec.trebuchet) { const t = trebuchet(spec.trebuchet); t.position.y = spec.turretY; root.add(t); parts.turret = t; parts.tarm = t.getObjectByName('tarm'); parts.cw = t.getObjectByName('cw'); parts.stone = t.getObjectByName('stone'); parts.muzzle = t.getObjectByName('muzzle'); }
   if (spec.fire && !isGhost) {
     const [x, y, z, s] = spec.fire, glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: '#ff7a2a', transparent: true, opacity: .5, blending: THREE.AdditiveBlending, depthWrite: false }));
     glow.position.set(x, y, z); glow.scale.setScalar(s * 3.4); glow.userData.size = s * 3.4; root.add(glow); parts.fire = glow;
@@ -728,5 +819,5 @@ export function projectileGeometries() {
     new THREE.BoxGeometry(.02, .26, .45).translate(0, 0, -.9), new THREE.BoxGeometry(.26, .02, .45).translate(0, 0, -.9),
   ].map(g => g.toNonIndexed()));
   const pot = mergeGeometries([new THREE.SphereGeometry(.28, 10, 7).scale(1, .9, 1), new THREE.CylinderGeometry(.1, .14, .16, 8).translate(0, .28, 0)].map(g => g.toNonIndexed()).map(g => { g.deleteAttribute('uv'); return g; }));
-  return { arrow, bolt, ball: new THREE.SphereGeometry(.3, 12, 8), orb: new THREE.PlaneGeometry(1, 1), pot };
+  return { arrow, bolt, ball: new THREE.SphereGeometry(.3, 12, 8), orb: new THREE.PlaneGeometry(1, 1), pot, boulder: boulderGeometry() };
 }
