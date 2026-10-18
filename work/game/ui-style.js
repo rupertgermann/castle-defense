@@ -167,7 +167,8 @@ position:fixed;inset:0;pointer-events:none;font-family:var(--serif);color:var(--
 #cd .kills .ic{font-size:17px;color:#4a3320}
 #cd .kills b{color:var(--ink)}
 #cd .acts{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:8px;margin-top:12px}
-#cd .acts .btn{white-space:nowrap;min-width:0}
+#cd .acts .btn{white-space:nowrap;min-width:0;flex-wrap:wrap;height:auto;min-height:58px;padding:6px 10px;gap:4px 7px}
+#cd .acts .btn .c{flex-basis:100%;justify-content:center}
 #cd .acts.solo{grid-template-columns:1fr}
 #cd .btn{flex:1;position:relative;display:flex;align-items:center;justify-content:center;gap:7px;height:42px;padding:0 10px;border-radius:7px;border:1.5px solid transparent;font-size:15px;font-weight:700;font-variant:small-caps;letter-spacing:.07em;color:#fff5dc;text-shadow:0 1px 0 rgba(0,0,0,.7);
  background:${grain(.3)} padding-box,linear-gradient(#4f7a2c,#2f5317 60%,#223f10) padding-box,var(--rim) border-box;box-shadow:0 0 0 1px #0c0704,0 4px 8px -2px rgba(0,0,0,.6),inset 0 1px 0 rgba(220,255,180,.35);transition:transform .12s,filter .2s}
