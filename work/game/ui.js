@@ -90,6 +90,12 @@ function selectDiff(k) {
 selectDiff(DIFFS[sessionStorage.getItem('cd-diff')] ? sessionStorage.getItem('cd-diff') : 'knight');
 
 let pendingLevel = LEVEL;
+function chooseLevel(k) {
+  pendingLevel = k;
+  for (const b of root.querySelectorAll('.mapbtn')) { const on = b.dataset.k === k; b.tabIndex = on ? 0 : -1; b.classList.toggle('sel', on); b.setAttribute('aria-checked', on); }
+  const l = LEVELS[k], t = $.title;
+  t.querySelector('.crest').textContent = l.crest; t.querySelector('.gtitle').textContent = l.name; t.querySelector('.gsub').textContent = l.tagline;
+}
 function startGame(k = diffKey, instant = false) {
   if (state.phase !== 'title') return;
   if (pendingLevel !== LEVEL) return switchLevel(pendingLevel, k);   // a level chosen with the arrows loads straight into its siege
@@ -470,8 +476,12 @@ function refreshHud(realDt) {
 
 function banner(k, t, s = '', bad = false) {
   $.banner.innerHTML = `<div class="k">${k}</div><div class="t">${t}</div><svg class="fl" aria-hidden="true"><use href="#i-flourish" width="100%" height="100%"/></svg>${s ? `<div class="s">${s}</div>` : ''}`;
-  $.banner.classList.toggle('bad', bad); flash($.banner, 'show'); root.classList.add('bannered');
-  clearTimeout(banner.t); banner.t = setTimeout(() => { $.banner.classList.remove('show'); root.classList.remove('bannered'); }, 3300);
+  $.banner.classList.toggle('bad', bad); flash($.banner, 'show'); root.classList.add('bannered'); banner.left = 3.3;
+}
+// The announcement's clock only runs while it can be read: a pause or an open ring/card holds it.
+function tickBanner(realDt) {
+  if (!(banner.left > 0) || state.paused || state.selected) return;
+  if ((banner.left -= realDt) <= 0) { $.banner.classList.remove('show'); root.classList.remove('bannered'); }
 }
 
 // ── End screens ──
@@ -516,7 +526,7 @@ function showMute() {
 }
 function act(a, el, e) {
   if (a === 'diff') return selectDiff(el.dataset.k), bus.emit('ui:click');
-  if (a === 'level') return bus.emit('ui:click'), switchLevel(el.dataset.k);
+  if (a === 'level') return bus.emit('ui:click'), chooseLevel(el.dataset.k), switchLevel(el.dataset.k);
   if (a === 'begin') return bus.emit('ui:click'), startGame();
   if (a === 'again' && el.classList.contains('pbtn') && !el.classList.contains('armed')) {   // abandoning a run in progress takes a second press
     el.classList.add('armed'); el.lastChild.textContent = ' Abandon this siege? Press again';
@@ -636,10 +646,7 @@ addEventListener('keydown', e => {
     }
     if (btn?.dataset.a === 'level' && (key === 'arrowleft' || key === 'arrowright')) {   // focus moves; Space switches level
       const bs = [...root.querySelectorAll('.mapbtn')], k = (bs.indexOf(btn) + (key === 'arrowright' ? 1 : bs.length - 1)) % bs.length;
-      e.preventDefault(); for (const b of bs) { const on = b === bs[k]; b.tabIndex = on ? 0 : -1; b.classList.toggle('sel', on); b.setAttribute('aria-checked', on); }
-      bs[k].focus(); pendingLevel = bs[k].dataset.k;   // like the difficulty cards: arrows choose; the world loads when the siege begins
-      const l = LEVELS[pendingLevel], t = $.title;
-      t.querySelector('.crest').textContent = l.crest; t.querySelector('.gtitle').textContent = l.name; t.querySelector('.gsub').textContent = l.tagline; return;
+      e.preventDefault(); chooseLevel(bs[k].dataset.k); bs[k].focus(); return;   // like the difficulty cards: arrows choose; the world loads when the siege begins
     }
     if (key === ' ' && btn) return;
     if (key === 'enter' || key === ' ') { e.preventDefault(); if (btn?.dataset.a === 'diff') selectDiff(btn.dataset.k); startGame(); }
@@ -699,7 +706,7 @@ export function update(dt, realDt = dt) {
   if (state.phase !== 'title') refreshHud(realDt);
   if (state.selected?.kind === 'tower' && cardKey !== towerKey(state.selected.tower)) renderTower();
   if (state.selected?.kind === 'pad' && preview && cardKey !== preview + (state.gold < TOWERS[preview].levels[0].cost)) showBuildCard(preview);
-  placeAnchored(); placePins(); updateTrails(realDt);
+  placeAnchored(); placePins(); updateTrails(realDt); tickBanner(realDt);
 }
 
 export const debug = {

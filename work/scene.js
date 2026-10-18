@@ -361,7 +361,8 @@ function fit() {
 fit();
 addEventListener('resize', fit);
 renderer.domElement.addEventListener('dblclick', () => { camera.position.copy(initialPosition); controls.target.copy(world.view.target); controls.update(); });
-renderer.domElement.addEventListener('keydown', e => {
+addEventListener('keydown', e => {   // on window: keyboard players reach the map without clicking it
+  if (e.target !== document.body && e.target !== renderer.domElement) return;
   const offset = camera.position.clone().sub(controls.target), spherical = new THREE.Spherical().setFromVector3(offset);
   if (e.key === 'ArrowLeft') spherical.theta -= .08;
   else if (e.key === 'ArrowRight') spherical.theta += .08;
