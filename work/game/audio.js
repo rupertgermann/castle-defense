@@ -310,8 +310,6 @@ export function unlock() {
   if (ctx.state !== 'running') ctx.resume();
 }
 export function setMuted(m) { muted = !!m; eng?.setVolumes(); }
-export function setVolume(master = vol.master, music = vol.music, sfxVol = vol.sfx) { Object.assign(vol, { master, music, sfx: sfxVol }); eng?.setVolumes(); }
-
 // ---------- debug + offline verification ----------
 function measure(b) {
   let peak = 0, sum = 0, last = 0;

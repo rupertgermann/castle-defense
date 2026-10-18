@@ -1,6 +1,6 @@
 # Castle Defense — module contract
 
-A tower-defense game with two levels (see Levels and worlds). **The castle, terrain, river, bridge, village, trees and lighting of Dawnhold must keep their current look.** Game content is added on top and must match that look: same warm morning light, same stone materials (`materials.stone/trim/base` from scene.js), grounded, detailed, believable medieval — not toy-like, not neon.
+A tower-defense game with three levels (see Levels and worlds). **The castle, terrain, river, bridge, village, trees and lighting of Dawnhold must keep their current look.** Game content is added on top and must match that look: same warm morning light, same stone materials (`materials.stone/trim/base` from scene.js), grounded, detailed, believable medieval — not toy-like, not neon.
 
 Quality bar: AAA. A harsh visual critic will review screenshots of your work and send it back until it is genuinely impressive.
 
@@ -9,7 +9,7 @@ Quality bar: AAA. A harsh visual critic will review screenshots of your work and
 | File | Owner | Purpose |
 |---|---|---|
 | `work/scene.js` | orchestrator | Environment. Only touch if absolutely required, keep diffs tiny, and say so in your report. |
-| `work/game/core.js` | orchestrator | `state`, `bus`, `lanes`, `gatePoint`, `distanceToLanes`. Do not change. |
+| `work/game/core.js` | orchestrator | `state`, `bus`, `lanes`, `gatePoint`. Do not change. |
 | `work/game/main.js` | orchestrator | Calls `init()` on all modules, then each frame `ui.update(dt, realDt)`, `enemies.update(dt)`, `towers.update(dt)`, `fx.update(dt, realDt)`, `audio.update(dt, realDt)`. `dt` is game time (0 when paused, ×speed). |
 | `work/game/enemies.js` | enemies agent | Enemy types, models, animation, movement, health bars, death. |
 | `work/game/towers.js` | towers agent | Build pads, tower types, models, upgrades, targeting, projectiles + damage. |
@@ -21,7 +21,7 @@ You may add helper files named `work/game/<yourmodule>-*.js`. Never edit another
 
 ## Levels and worlds
 
-`work/level.js` picks the level for this page load (`?level=` or `sessionStorage['cd-level']`, default `castle`); switching reloads the page. `scene.js` is the engine (renderer, post-processing, materials, building helpers, render loop) and builds one world: `work/worlds/castle.js` (Dawnhold, the river keep) or `work/worlds/frostmere.js` (Frostmere, the winter pass). Shared fortress pieces live in `work/worlds/fort-kit.js`. A world returns `{ height, BASE, gateCenter, sun, terrain, water, treeLocations, bridgeDeck, lanePaths, laneNames, padSpots, view, titleView, fortPoints, mist, fx: { chimneys, fires, smoke, ambient }, moving, animate(time) }`. Game modules must read world facts from these exports, never hard-code coordinates.
+`work/level.js` picks the level for this page load (`?level=` or `sessionStorage['cd-level']`, default `castle`); switching reloads the page. `scene.js` is the engine (renderer, post-processing, materials, building helpers, render loop) and builds one world: `work/worlds/castle.js` (Dawnhold, the river keep) `work/worlds/frostmere.js` (Frostmere, the winter pass) or `work/worlds/saltreach.js` (Saltreach, the sunset coast, three lanes). Shared fortress pieces live in `work/worlds/fort-kit.js`. A world returns `{ height, BASE, gateCenter, sun, terrain, water, treeLocations, bridgeDeck, lanePaths, laneNames, padSpots, view, titleView, fortPoints, mist, fx: { chimneys, fires, smoke, ambient }, moving, animate(time) }`. Game modules must read world facts from these exports, never hard-code coordinates.
 
 ## scene.js exports
 
@@ -39,7 +39,7 @@ state = { phase: 'title'|'build'|'wave'|'won'|'lost', gold, lives, maxLives, wav
 bus.on(name, fn); bus.emit(name, data)
 lanes[0] = south (village road → gate), lanes[1] = east (east road → bridge → gate)
 lane.length; lane.pointAt(d, target?) → Vector3 on the ground (d = metres from spawn); lane.directionAt(d, target?) → unit horizontal Vector3
-gatePoint: Vector3 at the castle gate; distanceToLanes(x, z)
+gatePoint: Vector3 at the castle gate
 ```
 
 ## enemies.js

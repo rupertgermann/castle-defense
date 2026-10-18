@@ -458,7 +458,6 @@ function fire(tower, target) {
   bus.emit('tower:fire', { tower, from: from.clone(), target, projectile: kind });
 }
 const m = t => t._.model;
-const impactTmp = new THREE.Vector3();
 function updateProjectiles(dt) {
   const L = projectiles.list;
   for (let i = L.length - 1; i >= 0; i--) {

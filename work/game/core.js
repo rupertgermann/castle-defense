@@ -65,10 +65,5 @@ export const lanes = lanePaths.map((points, i) => makeLane(laneNames[i], points)
 
 // Enemies that reach this point have breached the gate.
 export const gatePoint = new THREE.Vector3(gateCenter.x, gateCenter.y, gateCenter.z);
-
-// Minimum distance from (x, z) to any lane, horizontal. Used to keep build pads off the road.
-export function distanceToLanes(x, z) {
-  let best = Infinity; const v = new THREE.Vector3();
-  for (const lane of lanes) for (let d = 0; d <= lane.length; d += 1) { lane.pointAt(d, v); best = Math.min(best, Math.hypot(v.x - x, v.z - z)); }
   return best;
 }
