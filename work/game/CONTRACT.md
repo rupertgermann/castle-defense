@@ -9,13 +9,14 @@ Quality bar: AAA. A harsh visual critic will review screenshots of your work and
 | File | Owner | Purpose |
 |---|---|---|
 | `work/scene.js` | orchestrator | Environment. Only touch if absolutely required, keep diffs tiny, and say so in your report. |
-| `work/game/core.js` | orchestrator | `state`, `bus`, `lanes`, `gatePoint`. Do not change. |
-| `work/game/main.js` | orchestrator | Calls `init()` on all modules, then each frame `ui.update(dt, realDt)`, `enemies.update(dt)`, `towers.update(dt)`, `fx.update(dt, realDt)`, `audio.update(dt, realDt)`. `dt` is game time (0 when paused, ×speed). |
+| `work/game/core.js` | orchestrator | `state`, `bus`, `siege`, `lanes`, `gatePoint`. Do not change. |
+| `work/game/siege.js` | orchestrator | Siege rules: phase, waves, countdown, horn, gold, keep strength, win/lose, crowns. Imports nothing that loads the scene; tested in Node by `work/siege-test.mjs`. |
+| `work/game/main.js` | orchestrator | Calls `init()` on all modules, then each frame spawns what `siege.tick(dt)` returns, then `ui.update(dt, realDt)`, `enemies.update(dt)`, `towers.update(dt)`, `fx.update(dt, realDt)`, `audio.update(dt, realDt)`. `dt` is game time (0 when paused, ×speed). |
 | `work/game/enemies.js` | enemies agent | Enemy types, models, animation, movement, health bars, death. |
 | `work/game/towers.js` | towers agent | Build pads, tower types, models, upgrades, targeting, projectiles + damage. |
 | `work/game/fx.js` | fx agent | Particles, explosions, impacts, floating numbers, screen shake, castle damage visuals. Event-driven only. |
 | `work/game/audio.js` | audio agent | All sound, procedural WebAudio (no files; must work offline). Event-driven only. |
-| `work/game/ui.js` (+ `work/game/waves.js`) | ui agent | HUD (DOM overlay), title/victory/defeat screens, input + selection, build/upgrade menus, wave flow, camera framing. |
+| `work/game/ui.js` (+ `work/game/waves.js`) | ui agent | HUD (DOM overlay), title/victory/defeat screens, input + selection, build/upgrade menus, banners, camera framing. `waves.js` is pure data and must not import the scene or the page. |
 
 You may add helper files named `work/game/<yourmodule>-*.js`. Never edit another owner's file; if you need something from another module, code against this contract and mention the need in your report.
 
@@ -35,12 +36,28 @@ You may add helper files named `work/game/<yourmodule>-*.js`. Never edit another
 ## core.js
 
 ```js
-state = { phase: 'title'|'build'|'wave'|'won'|'lost', gold, lives, maxLives, wave, totalWaves, speed, paused, time, enemies: [], towers: [], selected }
+state = { phase: 'title'|'build'|'wave'|'won'|'lost', gold, lives, maxLives, wave, speed, paused, time, enemies: [], towers: [], selected }
 bus.on(name, fn); bus.emit(name, data)
 lanes = paths from the selected world; lane names and counts vary by level
 lane.length; lane.pointAt(d, target?) → Vector3 on the ground (d = metres from spawn); lane.directionAt(d, target?) → unit horizontal Vector3
 gatePoint: Vector3 at the castle gate
 ```
+
+## siege (core.js)
+
+**Siege is the only writer of `state.phase`, `wave`, `gold`, `lives` and `maxLives`.** Other modules read them and go through Siege to change them.
+
+```js
+siege.start(difficultyId, { waves, laneCount, hp }) → bool   // from 'title' only
+siege.callWave() → bool                // the horn; pays early gold for countdown left
+siege.tick(dt) → [{ type, lane, hpScale }]   // advances the siege; returns the foes due to spawn now
+siege.slain(enemy)                     // pays the bounty
+siege.leaked(enemy, damage) → bool     // costs keep strength during a wave only; a leak that empties the keep loses the siege
+siege.spend(cost) → bool; siege.earn(n)
+siege.skipTo(n); siege.end(won)        // debug
+siege.countdown, siege.pending, siege.waveSize, siege.stats   // read-only
+```
+
 
 ## enemies.js
 
@@ -51,7 +68,7 @@ export function damageEnemy(enemy, amount, { type = 'pierce' | 'blast' | 'magic'
 export function enemiesInRadius(pos, radius) → enemy[]
 ```
 Enemy object: `{ id, typeId, hp, maxHp, alive, lane, dist, pos /*Vector3 feet*/, velocity /*Vector3 m/s*/, radius, height, bounty, armor /*copied from its type at spawn*/, slowFactor }`. Aim point = `pos.y + height * .6`.
-Only living enemies are in `state.enemies`. On death: `state.gold += bounty`, emit `'enemy:death' {enemy, pos}`. On reaching the gate (`dist >= lane.length`): `state.lives -= damage`, emit `'enemy:leak' {enemy}`. On hit: emit `'enemy:hit' {enemy, amount, damageType, pos}`. On spawn: `'enemy:spawn' {enemy}`.
+Only living enemies are in `state.enemies`. On death: `siege.slain(enemy)`, emit `'enemy:death' {enemy, pos}`. On reaching the gate (`dist >= lane.length`): if `siege.leaked(enemy, damage)`, emit `'enemy:leak' {enemy}`. On hit: emit `'enemy:hit' {enemy, amount, damageType, pos}`. On spawn: `'enemy:spawn' {enemy}`.
 Must hold 60 fps with 80 live enemies (use instancing / merged geometry; skinned-look via procedural limb animation).
 
 ## towers.js
@@ -73,11 +90,11 @@ Towers own projectile flight and call `damageEnemy`. Emit `'tower:fire' {tower, 
 
 ## fx.js / audio.js
 
-Pure listeners on the events above plus `'wave:start' {wave}`, `'wave:clear' {wave}`, `'game:won'`, `'game:lost'`, `'ui:click'`, `'ui:error'`. Audio also exports `unlock()` (called by ui on first user gesture) and `setMuted(bool)`. FX may expose `shake(strength)` and `floatText(pos, text, color)`.
+Pure listeners on the events above plus `'wave:start' {wave, earlyBonus}`, `'wave:clear' {wave, bonus}`, `'game:won' {stats, crowns}`, `'game:lost' {stats}` (all emitted by Siege), `'ui:click'`, `'ui:error'`. Audio also exports `unlock()` (called by ui on first user gesture) and `setMuted(bool)`. FX may expose `shake(strength)` and `floatText(pos, text, color)`.
 
 ## ui.js
 
-Owns `state.phase`, wave spawning (via `spawnEnemy`), `state.selected`, pointer input (raycast → `towers.pick`), all DOM. Emits `'wave:start'`, `'wave:clear'`, `'game:won'`, `'game:lost'`, `'ui:click'`, `'ui:error'`. Game over when `state.lives <= 0`.
+Owns `state.selected`, pointer input (raycast → `towers.pick`), all DOM. Sends intents to Siege (`start`, `callWave`) and presents its events. Emits `'ui:click'`, `'ui:error'`.
 No `alert/confirm/prompt`. No external fonts or assets (single offline HTML) — use system fonts, CSS and inline SVG.
 
 ## Debug hooks (required, used by critics)
@@ -98,6 +115,7 @@ node work/preview.mjs
 node work/build.mjs [name] [--watch]
 node work/build-test.mjs
 node work/perf-scheduler-test.mjs
+node work/siege-test.mjs
 ```
 
 The preview builds `outputs/castle-defense.html`, watches imported game sources, and serves the file at `http://127.0.0.1:32947/` and `/castle-defense.html`. Both routes accept level query parameters. Reload the browser after a successful build. Restart the process after editing the build or preview script.

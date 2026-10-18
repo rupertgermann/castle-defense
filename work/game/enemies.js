@@ -1,7 +1,7 @@
 // Enemies: the invading host. Types, procedural rigged models (instanced per bone), movement along lanes,
 // crowd spreading, hit/slow/death reactions, billboard health bars and blob contact shadows.
 import { THREE, scene, camera, renderer, height, bridgeDeck, world as level } from '../scene.js';
-import { state, bus, lanes } from './core.js';
+import { state, bus, lanes, siege } from './core.js';
 import { buildModels } from './enemies-models.js';
 
 export const ENEMY_TYPES = {
@@ -247,7 +247,7 @@ export function enemiesInRadius(pos, radius) {
 function remove(e) { const i = state.enemies.indexOf(e); if (i >= 0) state.enemies.splice(i, 1); }
 function kill(e) {
   e.hp = 0; e.alive = false; remove(e);
-  state.gold += e.bounty;
+  siege.slain(e);
   e.ghost = 'die'; e.gt = 0; e.hitPhase = e.phase; e.velocity.set(0, 0, 0);
   ghosts.push(e);
   bus.emit('enemy:death', { enemy: e, pos: e.pos.clone() });
@@ -256,8 +256,7 @@ function leak(e) {
   e.alive = false; remove(e);
   e.ghost = 'leak'; e.gt = 0;
   ghosts.push(e);
-  if (state.phase !== 'wave') return;   // once the keep has fallen, stragglers just walk in
-  state.lives = Math.max(0, state.lives - ENEMY_TYPES[e.typeId].damage);
+  if (!siege.leaked(e, ENEMY_TYPES[e.typeId].damage)) return;   // once the keep has fallen, stragglers just walk in
   bus.emit('enemy:leak', { enemy: e });
 }
 

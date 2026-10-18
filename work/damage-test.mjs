@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { register } from 'node:module';
 
 const stub = { 'scene.js': `export * as THREE from '${import.meta.resolve('three')}'; export const scene = {}, camera = {}, renderer = {}, height = () => 0, bridgeDeck = () => null, world = {};`,
-  'core.js': 'export const state = { time: 0, enemies: [] }, bus = { emit() {} }, lanes = [];', 'enemies-models.js': 'export const buildModels = () => ({});' };
+  'core.js': 'export const state = { time: 0, enemies: [] }, bus = { emit() {} }, lanes = [], siege = { slain() {}, leaked: () => true };', 'enemies-models.js': 'export const buildModels = () => ({});' };
 register('data:text/javascript,' + encodeURIComponent(`const stub = ${JSON.stringify(stub)};
 export const resolve = (spec, ctx, next) => { const k = Object.keys(stub).find(k => spec.endsWith('/' + k));
   return k ? { url: 'data:text/javascript,' + encodeURIComponent(stub[k]), shortCircuit: true } : next(spec, ctx); };`));

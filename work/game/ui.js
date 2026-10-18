@@ -1,11 +1,12 @@
 // HUD, title/end screens, input + selection, build/upgrade menus, wave flow, camera framing.
 import { THREE, scene, camera, controls, renderer, titleView, fortPoints, laneNames } from '../scene.js';
 import { LEVEL, LEVELS, levelInfo, switchLevel } from '../level.js';
-import { state, bus, lanes } from './core.js';
+import { state, bus, lanes, siege } from './core.js';
 import * as towers from './towers.js';
 import * as enemies from './enemies.js';
 import * as audio from './audio.js';
-import { WAVES, schedule, composition, clearBonus, EARLY_GOLD_PER_SEC, BUILD_COUNTDOWN } from './waves.js';
+import { WAVES_BY_LEVEL, LEVEL_HP, schedule as scheduleFor, composition as compositionFor, EARLY_GOLD_PER_SEC } from './waves.js';
+import { DIFFICULTIES as DIFFS, STARTING_GOLD as BASE_GOLD } from './siege.js';
 import { CSS } from './ui-style.js';
 import { SPRITE, icon } from './ui-icons.js';
 
@@ -15,12 +16,8 @@ const enemyName = id => enemies.ENEMY_TYPES[id].name;
 const isBoss = id => !!enemies.ENEMY_TYPES[id].boss;
 const DTYPE = { pierce: 'Piercing', blast: 'Blast', magic: 'Arcane', fire: 'Fire' };
 
-const DIFFS = {
-  squire: { name: 'Squire', icon: 'shield', desc: 'A forgiving siege for new commanders.', lives: 30, gold: 1.25, hp: .8 },
-  knight: { name: 'Knight', icon: 'swords', desc: 'The siege as the chroniclers tell it.', lives: 20, gold: 1, hp: 1 },
-  lord: { name: 'Lord', icon: 'crown', desc: 'Few walls. Fewer coins. Fearsome foes.', lives: 10, gold: .85, hp: 1.3 },
-};
-const BASE_GOLD = state.gold;
+const WAVES = WAVES_BY_LEVEL[LEVEL], SIEGE_LEVEL = { waves: WAVES, laneCount: lanes.length, hp: LEVEL_HP[LEVEL] };
+const schedule = n => scheduleFor(SIEGE_LEVEL, n), composition = n => compositionFor(SIEGE_LEVEL, n);
 const touch = matchMedia('(hover: none)').matches;
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -77,9 +74,9 @@ const $ = {};
 for (const el of root.querySelectorAll('[data-r]')) $[el.dataset.r] = el;
 
 // ── Flow state ──
-let diffKey = 'knight', countdown = null, sched = [], si = 0, waveT = 0, muted = localStorage.getItem('cd-muted') === '1';
+let diffKey = 'knight', muted = localStorage.getItem('cd-muted') === '1';
 let final = null;
-const stats = { slain: 0, earned: 0, built: 0, leaks: lanes.map(() => 0) }, seen = new Set();
+const seen = new Set();
 let hover = null, hoverXY = null, preview = null, lastPointer = 'mouse';
 
 function selectDiff(k) {
@@ -100,9 +97,8 @@ function startGame(k = diffKey, instant = false) {
   if (state.phase !== 'title') return;
   if (pendingLevel !== LEVEL) return switchLevel(pendingLevel, k);   // a level chosen with the arrows loads straight into its siege
   selectDiff(k);
-  const d = DIFFS[k];
-  state.gold = Math.round(BASE_GOLD * d.gold); state.lives = state.maxLives = d.lives; state.wave = 0; state.phase = 'build';
-  countdown = null; dispGold = state.gold; lastGold = state.gold; lastLives = state.lives;
+  siege.start(k, SIEGE_LEVEL);
+  dispGold = state.gold; lastGold = state.gold; lastLives = state.lives;
   $.title.classList.add('out'); document.activeElement?.blur(); renderer.domElement.tabIndex = 0;
   setTimeout(() => $.title.classList.remove('on', 'out'), instant ? 0 : 800);
   root.classList.remove('intro');
@@ -112,37 +108,27 @@ function startGame(k = diffKey, instant = false) {
   banner(levelInfo.name, 'Prepare the Defences', 'Raise towers beside the roads, then sound the horn');
 }
 
-function callWave() {
-  if (state.phase !== 'build' || state.wave >= WAVES.length) return;
-  const bonus = countdown ? Math.round(countdown * EARLY_GOLD_PER_SEC) : 0;
-  if (bonus) { state.gold += bonus; stats.earned += bonus; }
-  state.wave++; state.phase = 'wave'; countdown = null;
-  sched = schedule(state.wave); si = 0; waveT = 0;
-  const w = WAVES[state.wave - 1];
-  bus.emit('wave:start', { wave: state.wave }); backToFight();
+function onWaveStart({ wave, earlyBonus: bonus }) {
+  const w = WAVES[wave - 1];
+  backToFight();
   // A foe type that hasn't marched before (and has a trait worth knowing) gets named in the banner.
-  const fresh = composition(state.wave).map(c => c.type).find(t => !seen.has(t) && enemies.ENEMY_TYPES[t].tip);
-  for (const c of composition(state.wave)) seen.add(c.type);
+  const fresh = composition(wave).map(c => c.type).find(t => !seen.has(t) && enemies.ENEMY_TYPES[t].tip);
+  for (const c of composition(wave)) seen.add(c.type);
   const gold = bonus ? `${icon('coin')} +${bonus} for sounding the horn early` : '';
   const sub = fresh ? `${icon(fresh)} New foe: ${enemyName(fresh)}. ${enemies.ENEMY_TYPES[fresh].tip}${gold ? `<i class="br"></i>${gold}` : ''}` : gold || (w.boss ? 'A champion leads this host' : '');
-  banner(`Wave ${state.wave} of ${WAVES.length}`, w.name, sub, w.boss);
+  banner(`Wave ${wave} of ${WAVES.length}`, w.name, sub, w.boss);
 }
 
-function waveClear() {
-  const n = state.wave, bonus = clearBonus(n);
-  state.gold += bonus; stats.earned += bonus;
-  bus.emit('wave:clear', { wave: n });
-  if (n >= WAVES.length) return endGame(true);
-  state.phase = 'build'; countdown = BUILD_COUNTDOWN;
+function onWaveClear({ wave: n, bonus }) {
+  if (n >= WAVES.length) return;   // the last wave ends the siege; the victory screen speaks for it
   banner(`Wave ${n} repelled`, n === WAVES.length - 1 ? 'The Warlord Approaches' : 'The Line Holds', `${icon('coin')} +${bonus} bounty from the treasury`);
 }
 
 // After keyboard browsing panned the camera away, Esc or the next wave brings back the whole field.
 function backToFight() { if (navMoved) { navMoved = false; flyTo('overview'); } }
-function endGame(won) {
-  state.phase = won ? 'won' : 'lost'; final = { ...stats, lives: state.lives };
+function onEnd(won, { stats, crowns = 0 }) {
+  final = { ...stats, crowns };
   deselect(); flyTo('title');   // the fireworks (or the flames) play out over the keep
-  bus.emit(won ? 'game:won' : 'game:lost');
   setTimeout(() => showEnd(won), won ? 1400 : 900);
 }
 
@@ -385,7 +371,7 @@ function setPins(counts) {
   [...$.pins.children].forEach((el, i) => { el.hidden = !counts[i]; set(el.firstChild, counts[i]); });
 }
 function placePins() {
-  if (state.phase === 'wave') { const c = lanes.map(() => 0); for (let k = si; k < sched.length; k++) c[sched[k].lane]++; for (const e of state.enemies) c[e.lane]++; setPins(c); }
+  if (state.phase === 'wave') { const c = lanes.map(() => 0); for (const s of siege.pending) c[s.lane]++; for (const e of state.enemies) c[e.lane]++; setPins(c); }
   else if (state.phase !== 'build') { setPins([]); return; }
   lanes.forEach((lane, i) => {
     const el = $.pins.children[i]; if (el.hidden) return;
@@ -442,8 +428,8 @@ function refreshHud(realDt) {
     if (!fighting) setPins(lanes.map((_, i) => w ? schedule(n).filter(e => e.lane === i).length : 0));
     $.pvbar.hidden = !fighting;
   }
-  const left = sched.length - si + state.enemies.length;
-  if (fighting) $.pvfill.style.width = `${100 * (1 - left / Math.max(1, sched.length))}%`;
+  const left = siege.pending.length + state.enemies.length, countdown = siege.countdown;
+  if (fighting) $.pvfill.style.width = `${100 * (1 - left / Math.max(1, siege.waveSize))}%`;
   const canCall = state.phase === 'build' && state.wave < WAVES.length;
   $.horn.disabled = !canCall; $.horn.classList.toggle('ready', canCall);
   set($.hornlabel, fighting ? 'Battle Joined' : 'Sound the Horn');
@@ -486,15 +472,15 @@ function tickBanner(realDt) {
 
 // ── End screens ──
 function showEnd(won) {
-  const stars = won ? (state.lives >= state.maxLives * .8 ? 3 : state.lives >= state.maxLives * .45 ? 2 : 1) : 0, key = `cd-stars:${LEVEL}:${diffKey}`;
+  const f = final, stars = f.crowns, key = `cd-stars:${LEVEL}:${diffKey}`;
   const best = Math.max(stars, +localStorage.getItem(key) || 0); if (stars) localStorage.setItem(key, best);
   const ids = Object.keys(LEVELS), next = ids[ids.indexOf(LEVEL) + 1];
-  const f = final || stats, cells = [['swords', won ? WAVES.length : Math.max(0, state.wave - 1), 'Waves survived'], ['skull', f.slain, 'Foes slain'], ['coin', f.earned, 'Gold earned'], ['tower', f.built, 'Towers raised']];
+  const cells = [['swords', won ? WAVES.length : Math.max(0, state.wave - 1), 'Waves survived'], ['skull', f.slain, 'Foes slain'], ['coin', f.earned, 'Gold earned'], ['tower', f.built, 'Towers raised']];
   $.end.className = `screen end on ${won ? 'won' : 'lost'}`;
   root.classList.add('ended'); controls.autoRotate = !reduced;
   $.end.innerHTML = `<div class="end-card parch"><div class="end-top"><div class="medal">${icon(won ? 'crown' : 'skull')}</div></div>
     <h2>${won ? 'Victory' : 'The Keep Has Fallen'}</h2>${won ? `<div class="stars" aria-label="${stars} of 3 stars">${[1, 2, 3].map(i => `<i class="${i <= stars ? 'on' : ''}" style="animation-delay:${.9 + i * .25}s">${icon('crown')}</i>`).join('')}</div>` : ''}${fl}
-    <p class="lead">${won ? levelInfo.won : `The gate gave way during wave ${state.wave}.${Math.max(...stats.leaks) ? ` Most of the breach came by the ${laneNames[stats.leaks.indexOf(Math.max(...stats.leaks))]}: strengthen the towers there.` : ''}`}</p>
+    <p class="lead">${won ? levelInfo.won : `The gate gave way during wave ${state.wave}.${Math.max(...f.leaks) ? ` Most of the breach came by the ${laneNames[f.leaks.indexOf(Math.max(...f.leaks))]}: strengthen the towers there.` : ''}`}</p>
     <div class="ledger">${cells.map(([ic, v, l]) => `<div>${icon(ic)}<b data-to="${v}">0</b><span>${l}</span></div>`).join('')}</div>
     ${won && stars < 3 ? `<p class="lead" style="margin-top:-6px;font-size:14px">${stars === 2 ? 'Lose fewer than a fifth of the keep for the third crown.' : 'Keep more of the walls standing for more crowns.'}</p>` : ''}
     ${won && next ? `<button class="cta" data-a="next">Onward to ${LEVELS[next].name}</button><button class="link" data-a="again" style="margin-top:10px">Defend ${levelInfo.name} again</button>` : `<button class="cta" data-a="again">${won ? 'Play Again' : 'Rise Again'}</button>`}
@@ -536,7 +522,7 @@ function act(a, el, e) {
   if (a === 'again') return bus.emit('ui:click'), restart();
   if (a === 'menu') return bus.emit('ui:click'), location.reload();
   if (a === 'next') { bus.emit('ui:click'); const ids = Object.keys(LEVELS); return switchLevel(ids[ids.indexOf(LEVEL) + 1], diffKey); }
-  if (a === 'horn') return bus.emit('ui:click'), callWave();
+  if (a === 'horn') return bus.emit('ui:click'), siege.callWave();
   if (a === 'close') return deselect();
   if (a === 'upgrade') return upgrade();
   if (a === 'sell') return sell();
@@ -654,7 +640,7 @@ addEventListener('keydown', e => {
   }
   if (state.phase === 'won' || state.phase === 'lost') { if (key === 'enter' && $.end.classList.contains('on') && !e.target.closest?.('#cd button')) restart(); return; }
   if ((key === ' ' || key === 'enter') && e.target.closest?.('#cd button')) return;   // a focused button keeps its own Space/Enter
-  if (key === ' ') { e.preventDefault(); if (!state.paused) callWave(); }
+  if (key === ' ') { e.preventDefault(); if (!state.paused) siege.callWave(); }
   else if (key === 'p') toggle('pause');
   else if (key === 'f') toggle('speed');
   else if (key === 'm') toggle('mute');
@@ -675,9 +661,11 @@ export function init() {
   setupCamera(); setupPointer(); showMute(); orderSites();
   // Leaving the tab mid-siege: come back to the pause menu rather than straight into the fight.
   document.addEventListener('visibilitychange', () => { if (document.hidden && !state.paused) toggle('pause'); });
-  bus.on('enemy:death', ({ enemy }) => { stats.slain++; stats.earned += enemy?.bounty || 0; });
-  bus.on('tower:build', () => { stats.built++; });
-  bus.on('enemy:leak', ({ enemy }) => { stats.leaks[enemy.lane]++; flash($.breach, 'on'); });
+  bus.on('wave:start', onWaveStart);
+  bus.on('wave:clear', onWaveClear);
+  bus.on('game:won', r => onEnd(true, r));
+  bus.on('game:lost', r => onEnd(false, r));
+  bus.on('enemy:leak', () => flash($.breach, 'on'));
   bus.on('tower:sell', ({ tower }) => { if (state.selected?.tower === tower) deselect(); });
   const again = sessionStorage.getItem('cd-restart');
   if (again && DIFFS[again]) { sessionStorage.removeItem('cd-restart'); requestAnimationFrame(() => startGame(again, true)); }
@@ -685,18 +673,6 @@ export function init() {
 
 export function update(dt, realDt = dt) {
   updateCamera(realDt);
-  if (state.phase === 'wave') {
-    waveT += dt;
-    while (si < sched.length && sched[si].t <= waveT) {
-      const s = sched[si++];
-      enemies.spawnEnemy(s.type, s.lane, { hpScale: s.hp * DIFFS[diffKey].hp });
-    }
-    if (si >= sched.length && state.enemies.length === 0 && state.lives > 0) waveClear();   // a last leak that ends the game is a defeat, not a repelled wave
-  } else if (state.phase === 'build' && countdown != null) {
-    countdown -= dt;
-    if (countdown <= 0) callWave();
-  }
-  if ((state.phase === 'build' || state.phase === 'wave') && state.lives <= 0) endGame(false);
   // Hover highlight: one raycast per frame at most, only when the mouse moved.
   if (hoverXY && (state.phase === 'build' || state.phase === 'wave')) {
     hover = pickAt(...hoverXY); hoverXY = null;
@@ -713,12 +689,12 @@ export const debug = {
   start: (k = 'knight') => startGame(k, true),
   skipToWave(n) {
     if (state.phase === 'title') startGame(diffKey, true);
-    state.phase = 'build'; state.wave = THREE.MathUtils.clamp(n, 1, WAVES.length) - 1; countdown = null; callWave();
+    siege.skipTo(n);
   },
-  give: g => { state.gold += g; },
+  give: g => siege.earn(g),
   select, deselect,
   preview: id => setPreview(id),
-  win: () => endGame(true),
-  lose: () => { state.lives = 0; },
-  stats,
+  win: () => siege.end(true),
+  lose: () => siege.end(false),
+  get stats() { return siege.stats; },
 };

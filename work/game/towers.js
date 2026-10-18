@@ -1,6 +1,6 @@
 // Towers: build pads, five tower types with three levels, targeting, projectiles and damage.
 import { THREE, scene, camera, renderer, composer, height, clearTrees, bridgeDeck, padSpots } from '../scene.js';
-import { state, bus, lanes } from './core.js';
+import { state, bus, lanes, siege } from './core.js';
 import { damageEnemy, enemiesInRadius, ENEMY_TYPES } from './enemies.js';
 import { instantiate, ghost, scaffold, padGeometry, runeTexture, projectileGeometries, poseArcher, poseBallista, glowTexture, renderArchers, liveArchers, MANGONEL, TREBUCHET } from './towers-models.js';
 
@@ -124,7 +124,7 @@ export function buildTower(pad, typeId, { instant = false, free = false } = {}) 
   const type = TOWER_TYPES[typeId];
   if (!pad || pad.tower || !type) return null;
   const cost = type.levels[0].cost;
-  if (!free) { if (state.gold < cost) return null; state.gold -= cost; }
+  if (!free && !siege.spend(cost)) return null;
   const tower = { id: nextTowerId++, typeId, level: 0, pad, pos: pad.pos.clone(), range: type.levels[0].range, target: null, kills: 0, spent: cost };
   tower._ = { cooldown: .4, yaw: pad.yaw, pitch: .3, shooter: 0, recoil: 0, flare: 0, draw: 1, anim: null, model: null, t: Math.random() * 10 };
   setModel(tower);
@@ -142,7 +142,7 @@ export function upgradeCost(tower) {
 export function upgradeTower(tower, { instant = false, free = false } = {}) {
   const cost = upgradeCost(tower);
   if (cost == null || tower._.dead) return false;
-  if (!free) { if (state.gold < cost) return false; state.gold -= cost; }
+  if (!free && !siege.spend(cost)) return false;
   tower.spent += cost;
   if (tower._.anim) finishAnim(tower);
   const old = tower._.model;
@@ -156,7 +156,7 @@ export function upgradeTower(tower, { instant = false, free = false } = {}) {
 export function sellValue(tower) { return Math.floor(tower.spent * .7); }
 export function sellTower(tower) {
   if (tower._.dead) return;
-  state.gold += sellValue(tower);
+  siege.earn(sellValue(tower));
   tower._.dead = true; tower.target = null;
   const i = state.towers.indexOf(tower); if (i >= 0) state.towers.splice(i, 1);
   tower.pad.tower = null; tower.pad._.hit.scale.y = 1.4; tower.pad._.hit.updateMatrixWorld();
