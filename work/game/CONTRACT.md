@@ -104,7 +104,7 @@ The preview builds `outputs/castle-defense.html`, watches imported game sources,
 
 The standalone builder defaults to the name `castle-defense`. A custom name produces `outputs/<name>.html`. `--watch` keeps the builder running without an HTTP server. esbuild starts at `work/game/main.js`; only files in its dependency graph are watched. Unrelated scripts and documentation do not trigger rebuilds. Successful builds replace the HTML through a temporary file and rename. Failed rebuilds leave the last successful HTML available and recover when the source is fixed. An initial build failure exits.
 
-The browser runs the bundled HTML without loading files from `work/`. Three.js, styles, and shaders are embedded, and game assets are generated in code. Generated HTML is not an editing source.
+The browser runs the bundled HTML without loading files from `work/`. Three.js, styles, and shaders are embedded, and game assets are generated in code. The HTML embeds the project MIT license and the installed Three.js MIT license. Restart a watcher after changing license text. Generated HTML is not an editing source.
 
 ## Visual verification
 
@@ -113,6 +113,6 @@ node work/build.mjs dev-review
 node work/shot.mjs dev-review work/shots/dev-review/title.png --size 1600x900 --wait 3000
 ```
 
-`shot.mjs` also accepts `--eval "<js>"` to prepare a scene before capture. It reports frame statistics and console errors or warnings. Inspect the screenshots and exercise the changed gameplay path. Browser tools depend on the absolute Playwright path in the local Codex runtime and a Chromium installation.
+`shot.mjs` also accepts `--eval "<js>"` to prepare a scene before capture. It reports frame statistics and console errors or warnings. Inspect the screenshots and exercise the changed gameplay path. Browser tools import the local Playwright development dependency. Install Chromium with `npm exec --prefix work -- playwright install chromium`. `node work/gallery.mjs` captures the README gallery and records the build hash and live scene state.
 
 The [README](../../README.md#verify-changes) lists gameplay, audio, UX, and performance commands and their options. `work/verify.mjs` targets the absent castle-only HTML and is not a game acceptance check.

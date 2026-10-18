@@ -2,6 +2,34 @@
 
 Castle Defense is a browser tower-defense game built with Three.js. Defend the gate through 15 waves, build and upgrade towers, and choose between three battlefields and three difficulty settings.
 
+## Gameplay gallery
+
+Each battlefield has a title screen, a live combat view, and a tower-management view. Battles use Squire difficulty with the normal starting gold and tower costs. The game continues running while the tower card is open.
+
+### Dawnhold
+
+Defend the river keep and its village roads.
+
+![Dawnhold title screen](docs/screenshots/castle-intro.jpg)
+![Dawnhold during a live battle](docs/screenshots/castle-battle.jpg)
+![Dawnhold tower range and upgrade card during the battle](docs/screenshots/castle-tower.jpg)
+
+### Frostmere
+
+Hold the fortress above the snowy mountain pass.
+
+![Frostmere title screen](docs/screenshots/frostmere-intro.jpg)
+![Frostmere during a live battle](docs/screenshots/frostmere-battle.jpg)
+![Frostmere tower range and upgrade card during the battle](docs/screenshots/frostmere-tower.jpg)
+
+### Saltreach
+
+Guard the coastal fortress and its three approaches.
+
+![Saltreach title screen](docs/screenshots/saltreach-intro.jpg)
+![Saltreach during a live battle](docs/screenshots/saltreach-battle.jpg)
+![Saltreach tower range and upgrade card during the battle](docs/screenshots/saltreach-tower.jpg)
+
 ## Run the local preview
 
 Use Node.js and npm. Node.js 24 is the development runtime used for the build and preview checks. Run these commands from the repository root:
@@ -94,10 +122,17 @@ node work/perf-scheduler-test.mjs
 
 The build test creates a temporary fixture, builds a custom output, and runs a temporary preview on an ephemeral port. It checks HTTP routes, query parameters, rebuilds, preservation of valid HTML after a syntax error, and recovery. It cleans up its process and temporary files. The scheduler test checks frame timing behavior.
 
-The browser tools use Playwright from an absolute path in Rupert's local Codex runtime. Playwright is not a dependency in `work/package.json`. These tools require that runtime and Chromium; their launch options target the macOS Metal backend. Build the requested HTML before running them.
+The browser tools use Playwright from `devDependencies` in `work/package.json`. Install dependencies with `npm ci --prefix work`, then install Chromium:
+
+```bash
+npm exec --prefix work -- playwright install chromium
+```
+
+Build the requested HTML before running browser tools. GPU launch options use Metal on macOS and the browser defaults on other platforms.
 
 | Command | Purpose and options |
 | --- | --- |
+| `node work/gallery.mjs` | Capture nine images in `docs/screenshots/`: title screens, live combat, and tower management for all three levels. It uses normal game APIs to spend starting gold and keyboard/mouse input to start combat and select towers. It records the HTML SHA-256 and scene state in `manifest.json`, and rejects browser errors or external HTTP requests. |
 | `node work/shot.mjs <name> <out.png> [--size 1600x900] [--eval "<js>"] [--wait 3000]` | Screenshot a built game; `name` excludes `.html`. |
 | `node work/playtest.mjs [name] [speed] [level]` | Play through via input. Defaults to `castle-defense` and speed `3`. Create `work/shots/play/` first. |
 | `node work/game/audio-test.mjs [name] [level]` | Check synthesized sounds and mixes for clipping, silence, and duration. Default output name is `dev-audio`. |
@@ -115,3 +150,9 @@ node work/shot.mjs castle-defense work/shots/title.png --size 1600x900
 ```
 
 `work/verify.mjs` targets the absent `outputs/castle-at-dawn.html` and checks a scene with no visible text. It is not a verification command for Castle Defense. Screenshots and active gameplay inspection are needed to assess visual quality; passing script checks alone does not establish it.
+
+## License
+
+The project source and gameplay screenshots are distributed under the [MIT license](LICENSE). Three.js retains its own MIT copyright notice; see [third-party notices](THIRD_PARTY_NOTICES.md). The standalone HTML includes both full MIT license texts.
+
+See the [publication review](docs/publication-review.md) for the audit scope, checks, and remaining release decisions.

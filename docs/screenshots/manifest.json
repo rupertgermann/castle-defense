@@ -1,0 +1,123 @@
+{
+  "htmlSha256": "0614e67d3c5ba31774465a0c9083dcca2c83a1eb6c3f99bbf23453114e8caef8",
+  "viewport": {
+    "width": 1600,
+    "height": 1000
+  },
+  "captures": [
+    {
+      "file": "castle-intro.jpg",
+      "level": "castle",
+      "scene": "intro",
+      "phase": "title",
+      "consoleErrors": [],
+      "externalRequests": []
+    },
+    {
+      "file": "castle-battle.jpg",
+      "level": "castle",
+      "scene": "battle",
+      "time": 28.12529999999985,
+      "phase": "wave",
+      "wave": 1,
+      "lives": 30,
+      "gold": 53,
+      "enemies": 6,
+      "towers": 3,
+      "paused": false,
+      "consoleErrors": [],
+      "externalRequests": []
+    },
+    {
+      "file": "castle-tower.jpg",
+      "level": "castle",
+      "scene": "tower",
+      "time": 30.61319999999983,
+      "phase": "wave",
+      "wave": 1,
+      "lives": 30,
+      "gold": 53,
+      "enemies": 6,
+      "towers": 3,
+      "paused": false,
+      "consoleErrors": [],
+      "externalRequests": []
+    },
+    {
+      "file": "frostmere-intro.jpg",
+      "level": "frostmere",
+      "scene": "intro",
+      "phase": "title",
+      "consoleErrors": [],
+      "externalRequests": []
+    },
+    {
+      "file": "frostmere-battle.jpg",
+      "level": "frostmere",
+      "scene": "battle",
+      "time": 73.55239999999984,
+      "phase": "wave",
+      "wave": 1,
+      "lives": 30,
+      "gold": 53,
+      "enemies": 8,
+      "towers": 3,
+      "paused": false,
+      "consoleErrors": [],
+      "externalRequests": []
+    },
+    {
+      "file": "frostmere-tower.jpg",
+      "level": "frostmere",
+      "scene": "tower",
+      "time": 76.02379999999984,
+      "phase": "wave",
+      "wave": 1,
+      "lives": 30,
+      "gold": 53,
+      "enemies": 8,
+      "towers": 3,
+      "paused": false,
+      "consoleErrors": [],
+      "externalRequests": []
+    },
+    {
+      "file": "saltreach-intro.jpg",
+      "level": "saltreach",
+      "scene": "intro",
+      "phase": "title",
+      "consoleErrors": [],
+      "externalRequests": []
+    },
+    {
+      "file": "saltreach-battle.jpg",
+      "level": "saltreach",
+      "scene": "battle",
+      "time": 31.927999999999816,
+      "phase": "wave",
+      "wave": 1,
+      "lives": 30,
+      "gold": 53,
+      "enemies": 8,
+      "towers": 3,
+      "paused": false,
+      "consoleErrors": [],
+      "externalRequests": []
+    },
+    {
+      "file": "saltreach-tower.jpg",
+      "level": "saltreach",
+      "scene": "tower",
+      "time": 34.491099999999825,
+      "phase": "wave",
+      "wave": 1,
+      "lives": 30,
+      "gold": 53,
+      "enemies": 8,
+      "towers": 3,
+      "paused": false,
+      "consoleErrors": [],
+      "externalRequests": []
+    }
+  ]
+}

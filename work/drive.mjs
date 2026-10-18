@@ -1,13 +1,13 @@
 // Scripted session for UX review: runs a steps file against the built game and saves numbered screenshots.
 // Usage (project root): node work/drive.mjs <steps.mjs> [--size 1440x900] [--level frostmere] [--touch] [--out dir] [--html name]
 // The steps file default-exports async ({ page, shot, padXY, wait }) => {}.
-import { chromium } from '/Users/rupertgermann/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
+import { chromium } from 'playwright';
 import { pathToFileURL } from 'node:url';
 import { mkdir } from 'node:fs/promises';
 const [stepsFile, ...rest] = process.argv.slice(2);
 const opt = k => { const i = rest.indexOf(k); return i >= 0 ? rest[i + 1] : undefined; };
 const [w, h] = (opt('--size') || '1440x900').split('x').map(Number), touch = rest.includes('--touch');
-const browser = await chromium.launch({ headless: true, args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] });
+const browser = await chromium.launch({ headless: true, args: process.platform === 'darwin' ? ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] : [] });
 const page = await browser.newPage({ viewport: { width: w, height: h }, hasTouch: touch, isMobile: touch });
 const errors = [];
 page.on('pageerror', e => errors.push('pageerror: ' + e.message));

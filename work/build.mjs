@@ -1,10 +1,12 @@
 // Usage: node work/build.mjs [name] [--watch]  → outputs/<name>.html (default: castle-defense). Run from the project root.
 import { build, context } from 'esbuild';
-import { writeFile, rename } from 'node:fs/promises';
+import { readFile, writeFile, rename } from 'node:fs/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 
 export async function buildGame(name = 'castle-defense', watch = false) {
+  const notices = await readFile(new URL('../LICENSE', import.meta.url), 'utf8') + '\n\n'
+    + await readFile(new URL('./node_modules/three/LICENSE', import.meta.url), 'utf8');
   const output = new URL(`../outputs/${name}.html`, import.meta.url);
   const options = {
     absWorkingDir: fileURLToPath(new URL('../', import.meta.url)),
@@ -15,6 +17,9 @@ export async function buildGame(name = 'castle-defense', watch = false) {
         if (result.errors.length) return;
         const script = result.outputFiles[0].text.replaceAll('</script', '<\\/script');
         const html = `<!doctype html>
+<!--
+${notices}
+-->
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="dark"><title>Castle Defense</title>
 <style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:radial-gradient(ellipse at 50% 40%,#2a1d10,#0d0905)}canvas{display:block;width:100%;height:100%;outline:none;touch-action:none;opacity:0;transition:opacity 1.1s ease}body.ready canvas{opacity:1}
 #splash{position:fixed;inset:0;display:grid;place-items:center;font:italic 17px/1 "Palatino Linotype",Palatino,Georgia,serif;letter-spacing:.12em;color:#cdb88f;transition:opacity .6s;animation:sp 1.6s ease-in-out infinite alternate}body.ready #splash{opacity:0;animation:none;pointer-events:none}@keyframes sp{from{opacity:.45}to{opacity:1}}

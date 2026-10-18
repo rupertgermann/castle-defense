@@ -1,9 +1,9 @@
 // Offline audio verification: renders every sound and several full mixes in headless Chromium, checks peak/silence/duration.
 // Usage (project or worktree root): node work/build.mjs dev-audio && node work/game/audio-test.mjs [dev-audio]
-import { chromium } from '/Users/rupertgermann/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
+import { chromium } from 'playwright';
 import { pathToFileURL } from 'node:url';
 const name = process.argv[2] || 'dev-audio';
-const browser = await chromium.launch({ headless: true, args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] });
+const browser = await chromium.launch({ headless: true, args: process.platform === 'darwin' ? ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] : [] });
 const page = await browser.newPage();
 const errors = [];
 page.on('pageerror', e => errors.push('pageerror: ' + e.message));

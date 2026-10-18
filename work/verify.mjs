@@ -1,4 +1,4 @@
-import { chromium } from '/Users/rupertgermann/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
+import { chromium } from 'playwright';
 import { pathToFileURL } from 'node:url';
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';

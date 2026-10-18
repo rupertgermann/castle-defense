@@ -15,4 +15,4 @@ The [README](../README.md) contains setup, controls, command options, and verifi
 
 Gameplay changes require exercising the affected player interaction. Visual changes require active gameplay captures and visual inspection across the affected battlefields and viewport sizes. Performance measurements must identify the build and workload measured. Test results do not substitute for visual acceptance.
 
-The preview requires a manual browser reload after rebuilding. Browser automation scripts depend on the local Codex Playwright runtime. `work/verify.mjs` references an absent castle-only artifact and does not verify the game.
+The preview requires a manual browser reload after rebuilding. Browser automation scripts use the local Playwright development dependency and an installed Chromium browser. `work/verify.mjs` references an absent castle-only artifact and does not verify the game.
