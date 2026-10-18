@@ -478,8 +478,8 @@ function refreshHud(realDt) {
 
 function banner(k, t, s = '', bad = false) {
   $.banner.innerHTML = `<div class="k">${k}</div><div class="t">${t}</div><svg class="fl" aria-hidden="true"><use href="#i-flourish" width="100%" height="100%"/></svg>${s ? `<div class="s">${s}</div>` : ''}`;
-  $.banner.classList.toggle('bad', bad); flash($.banner, 'show');
-  clearTimeout(banner.t); banner.t = setTimeout(() => $.banner.classList.remove('show'), 3300);
+  $.banner.classList.toggle('bad', bad); flash($.banner, 'show'); root.classList.add('bannered');
+  clearTimeout(banner.t); banner.t = setTimeout(() => { $.banner.classList.remove('show'); root.classList.remove('bannered'); }, 3300);
 }
 
 // ── End screens ──
@@ -648,7 +648,9 @@ addEventListener('keydown', e => {
     if (btn?.dataset.a === 'level' && (key === 'arrowleft' || key === 'arrowright')) {   // focus moves; Space switches level
       const bs = [...root.querySelectorAll('.mapbtn')], k = (bs.indexOf(btn) + (key === 'arrowright' ? 1 : bs.length - 1)) % bs.length;
       e.preventDefault(); for (const b of bs) { const on = b === bs[k]; b.tabIndex = on ? 0 : -1; b.classList.toggle('sel', on); b.setAttribute('aria-checked', on); }
-      bs[k].focus(); pendingLevel = bs[k].dataset.k; return;   // like the difficulty cards: arrows choose; the level loads when the siege begins
+      bs[k].focus(); pendingLevel = bs[k].dataset.k;   // like the difficulty cards: arrows choose; the world loads when the siege begins
+      const l = LEVELS[pendingLevel], t = $.title;
+      t.querySelector('.crest').textContent = l.crest; t.querySelector('.gtitle').textContent = l.name; t.querySelector('.gsub').textContent = l.tagline; return;
     }
     if (key === ' ' && btn) return;
     if (key === 'enter' || key === ' ') { e.preventDefault(); if (btn?.dataset.a === 'diff') selectDiff(btn.dataset.k); startGame(); }

@@ -108,7 +108,7 @@ position:fixed;inset:0;pointer-events:none;font-family:var(--serif);color:var(--
 /* Banner */
 #cd .banner{position:absolute;left:50%;top:22%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;opacity:0;white-space:nowrap}
 #cd .banner.show{animation:cdBanner 3.2s cubic-bezier(.2,.8,.2,1) forwards}
-#cd.has-sel .banner{visibility:hidden}   /* a build ring or tower card in use outranks the announcement */
+#cd.has-sel .banner,#cd.is-paused .banner{visibility:hidden}   /* a build ring, tower card or pause menu outranks the announcement */
 #cd .banner .k{font-size:15px;letter-spacing:.4em;font-variant:small-caps;color:#f3dfb0;text-shadow:0 2px 6px #000}
 #cd .banner .t{font-size:clamp(30px,4.4vw,54px);font-weight:700;font-variant:small-caps;letter-spacing:.06em;background:linear-gradient(#fff8dc,#f2cb6b 50%,#a8741d);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 2px 0 #3a2305) drop-shadow(0 6px 14px rgba(0,0,0,.7))}
 #cd .banner.bad .t{background-image:linear-gradient(#fff0e6,#ff9d7c 45%,#a8251a)}
@@ -283,6 +283,7 @@ position:fixed;inset:0;pointer-events:none;font-family:var(--serif);color:var(--
 #cd .pin::after{content:"";position:absolute;left:50%;bottom:-6px;margin-left:-6px;border:6px solid transparent;border-bottom:0;border-top-color:#23170d}
 #cd .pin[hidden]{display:none}
 #cd.fighting .pin{opacity:.5}   /* in battle the label steps back so the foes beneath it show */
+#cd.bannered .pin{visibility:hidden}   /* the announcement has the floor while it shows */
 #cd .breach{position:absolute;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center,transparent 52%,rgba(150,16,8,.55) 100%)}
 #cd .breach.on{animation:cdBreach .9s ease-out}
 @keyframes cdBreach{0%{opacity:0}12%{opacity:1}100%{opacity:0}}
