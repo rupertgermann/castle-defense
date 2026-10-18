@@ -19,24 +19,33 @@ Each battlefield has a title screen, a live combat view, and a tower-management 
 Defend the river keep and its village roads.
 
 ![Dawnhold title screen](docs/screenshots/castle-intro.jpg)
-![Dawnhold during a live battle](docs/screenshots/castle-battle.jpg)
-![Dawnhold tower range and upgrade card during the battle](docs/screenshots/castle-tower.jpg)
+
+<p>
+  <img src="docs/screenshots/castle-battle.jpg" alt="Dawnhold during a live battle" width="49%">
+  <img src="docs/screenshots/castle-tower.jpg" alt="Dawnhold tower range and upgrade card during the battle" width="49%">
+</p>
 
 ### Frostmere
 
 Hold the fortress above the snowy mountain pass.
 
 ![Frostmere title screen](docs/screenshots/frostmere-intro.jpg)
-![Frostmere during a live battle](docs/screenshots/frostmere-battle.jpg)
-![Frostmere tower range and upgrade card during the battle](docs/screenshots/frostmere-tower.jpg)
+
+<p>
+  <img src="docs/screenshots/frostmere-battle.jpg" alt="Frostmere during a live battle" width="49%">
+  <img src="docs/screenshots/frostmere-tower.jpg" alt="Frostmere tower range and upgrade card during the battle" width="49%">
+</p>
 
 ### Saltreach
 
 Guard the coastal fortress and its three approaches.
 
 ![Saltreach title screen](docs/screenshots/saltreach-intro.jpg)
-![Saltreach during a live battle](docs/screenshots/saltreach-battle.jpg)
-![Saltreach tower range and upgrade card during the battle](docs/screenshots/saltreach-tower.jpg)
+
+<p>
+  <img src="docs/screenshots/saltreach-battle.jpg" alt="Saltreach during a live battle" width="49%">
+  <img src="docs/screenshots/saltreach-tower.jpg" alt="Saltreach tower range and upgrade card during the battle" width="49%">
+</p>
 
 ## Run the local preview
 
