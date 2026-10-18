@@ -27,6 +27,7 @@ jobs:
       - run: node work/build-test.mjs
       - run: node work/perf-scheduler-test.mjs
       - run: node work/siege-test.mjs
+      - run: node work/towers-test.mjs
       - run: node work/build.mjs
       - name: Prepare website
         run: |

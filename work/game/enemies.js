@@ -244,6 +244,10 @@ export function enemiesInRadius(pos, radius) {
   return out;
 }
 
+// Road speed now: slows, hit stagger and crowding all hold a foe back. distAfter: where its pace takes it in T seconds.
+const pace = e => ENEMY_TYPES[e.typeId].speed * e.slowFactor * (1 - e.stagger * .5) * (e.crowd ?? 1);
+export const distAfter = (e, T) => e.dist + pace(e) * T;
+
 function remove(e) { const i = state.enemies.indexOf(e); if (i >= 0) state.enemies.splice(i, 1); }
 function kill(e) {
   e.hp = 0; e.alive = false; remove(e);
@@ -331,9 +335,9 @@ export function update(dt) {
       const t = ENEMY_TYPES[e.typeId], k = KIND[e.typeId];
       e.age += dt;
       if (e.slowFactor < 1 && state.time >= e.slowUntil) e.slowFactor = 1;
-      const pace = t.speed * e.slowFactor * (1 - e.stagger * .5) * (e.crowd ?? 1);
-      if (!debug.hold) e.dist += pace * dt;
-      e.phase += pace * dt / (k.stride * SCALE) * TAU;
+      const v = pace(e);
+      if (!debug.hold) e.dist += v * dt;
+      e.phase += v * dt / (k.stride * SCALE) * TAU;
       e.flash = Math.max(0, e.flash - dt * 6);
       e.stagger = Math.max(0, e.stagger - dt * 3);
       e.trail = e.trail > e.hp / e.maxHp ? Math.max(e.hp / e.maxHp, e.trail - dt * .45) : e.hp / e.maxHp;
