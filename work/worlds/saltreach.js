@@ -117,6 +117,8 @@ export function buildSaltreach(K) {
   cands.sort((a, b) => a[2] - b[2]);
   let added = 0;
   for (const [x, z] of cands) { if (added >= 4) break; if (padSpots.some(([px, pz]) => Math.hypot(px - x, pz - z) < 13)) continue; padSpots.push([x, z]); added++; }
+  // Sites far out on the roads drag the overview out to sea; the fight is won near the junction.
+  for (let i = padSpots.length - 1; i >= 0; i--) if (Math.hypot(padSpots[i][0], padSpots[i][1] - 23.5) > 150) padSpots.splice(i, 1);
   const nearPad = (x, z, r) => padSpots.some(([px, pz]) => Math.hypot(px - x, pz - z) < r);
 
 
