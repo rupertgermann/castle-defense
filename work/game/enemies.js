@@ -30,6 +30,7 @@ const KIND = {
 };
 
 let models, material, bars, shadows, pips, nextId = 1;
+const bossPips = [];
 const ghosts = []; // dying / leaking enemies still animating
 const PI = Math.PI, TAU = PI * 2;
 const _v = new THREE.Vector3(), _d = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _s = new THREE.Vector3();
@@ -441,7 +442,9 @@ const _cr = new THREE.Matrix4(), _cm = new THREE.Matrix4();
 function render() {
   for (const m of Object.values(models)) for (const mesh of m.meshes) mesh.count = 0;
   bars.n = 0; pips.n = 0; shadows.count = 0;
+  bossPips.length = 0;
   for (const e of state.enemies) draw(e);
+  for (const [x, y, z, h] of bossPips) if (pips.n < pips.cap) { const i = pips.n++; pips.geometry.attributes.position.array.set([x, y, z], i * 3); pips.geometry.attributes.size.array[i] = -h; }   // bosses last, on top of their escort
   for (const g of ghosts) draw(g);
   for (const m of Object.values(models)) for (const mesh of m.meshes) {
     mesh.instanceMatrix.needsUpdate = true; mesh.fx.needsUpdate = true; mesh.instanceColor.needsUpdate = true;
@@ -522,7 +525,8 @@ function draw(e) {
     _root.toArray(shadows.instanceMatrix.array, i * 16);
     shadows.alpha.array[i] = (1 - Math.max(fade, sink)) * (e.typeId === 'ram' ? .95 : 1);
   }
-  if (e.alive && pips.n < pips.cap) {
+  if (e.alive && type.boss) bossPips.push([e.pos.x, e.pos.y + type.height * e.scale * SEP * .55, e.pos.z, type.height * e.scale * SEP]);
+  else if (e.alive && pips.n < pips.cap) {
     const i = pips.n++, h = type.height * e.scale * SEP;
     pips.geometry.attributes.position.array.set([e.pos.x, e.pos.y + h * .55, e.pos.z], i * 3); pips.geometry.attributes.size.array[i] = type.boss ? -h : h;
   }

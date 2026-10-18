@@ -190,6 +190,7 @@ position:fixed;inset:0;pointer-events:none;font-family:var(--serif);color:var(--
 #cd .pbtn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:8px;padding:9px 18px;border-radius:7px;font-size:16px;letter-spacing:.08em;color:var(--txt);background:rgba(0,0,0,.28);box-shadow:inset 0 0 0 1px rgba(231,189,90,.35);text-shadow:none}
 #cd .pbtn:first-of-type{margin-top:12px;color:var(--gold-hi);box-shadow:inset 0 0 0 1px rgba(231,189,90,.8)}
 #cd .pbtn:hover{background:rgba(231,189,90,.16)}
+#cd .pbtn.armed{background:linear-gradient(#a8301f,#6d130d);color:#fff4d8}
 #cd .pbtn .kbd{margin-left:4px;font-size:11px;padding:0 5px;border-radius:3px;background:#1a110a;color:var(--txt2);box-shadow:0 0 0 1px #6b5022;font-variant:normal;letter-spacing:0}
 #cd.is-paused.has-sel .paused{display:none}
 #cd.is-paused .paused{display:block;animation:cdFade .25s}

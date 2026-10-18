@@ -267,10 +267,10 @@ function deselect() {
 }
 
 // ── Build menu (radial) ──
-let anchor = null, cardEl = null, cardKind = null, cardKey = '';
+let bmR = 80, anchor = null, cardEl = null, cardKind = null, cardKey = '';
 function openBuild(pad) {
   anchor = pad.pos; cardEl = null; $.cards.innerHTML = ''; cardKind = 'build';
-  const ids = TOWER_IDS, n = ids.length, R = (innerWidth <= 760 ? 74 : 72) + Math.max(0, n - 5) * 9;
+  const ids = TOWER_IDS, n = ids.length, R = bmR = (innerWidth <= 760 ? 74 : 72) + Math.max(0, n - 5) * 9;
   $.bm.innerHTML = `<div class="bm-ring"></div>` + ids.map((id, i) => {
     const a = (-135 + i * 360 / Math.max(n, 1)) * Math.PI / 180, x = Math.round(Math.cos(a) * R), y = Math.round(Math.sin(a) * R), c = TOWERS[id].levels[0].cost;
     return `<button class="bm-opt" data-a="build" data-t="${id}" style="left:${x}px;top:${y}px;--fx:${-x}px;--fy:${-y}px;animation-delay:${i * 40}ms" aria-label="Build ${TOWERS[id].name}, ${c} gold">
@@ -360,7 +360,8 @@ function placeAnchored() {
   const bmOn = $.bm.classList.contains('open');
   if (bmOn) {
     const docked = compact && W > H && cardEl;   // landscape phone: card docked right, see ui-style
-    const topLimit = $.top.offsetTop + $.top.offsetHeight + 90, botLimit = H - (compact && cardEl && !docked ? cardEl.offsetHeight + 130 : 90);
+    const reach = bmR + 50;   // ring radius + option medallion + price tag
+    const topLimit = $.top.offsetTop + $.top.offsetHeight + reach, botLimit = H - (compact && cardEl && !docked ? cardEl.offsetHeight + 130 : reach + ($.hint.offsetHeight ? $.hint.offsetHeight + 16 : 0));
     const edge = (compact ? 74 : 72) + 52, bx = THREE.MathUtils.clamp(sx, edge, W - (docked ? cardEl.offsetWidth + 110 : edge)), by = THREE.MathUtils.clamp(sy, topLimit, Math.max(topLimit, botLimit));
     $.bm.style.transform = `translate(${bx}px,${by}px)`; $.bm.style.visibility = visible ? '' : 'hidden';
     sx = bx; sy = by;
@@ -444,7 +445,8 @@ function refreshHud(realDt) {
   const canCall = state.phase === 'build' && state.wave < WAVES.length;
   $.horn.disabled = !canCall; $.horn.classList.toggle('ready', canCall);
   set($.hornlabel, fighting ? 'Battle Joined' : 'Sound the Horn');
-  const sub = fighting ? `${sched.length - si + state.enemies.length} foes remain`
+  const left = sched.length - si + state.enemies.length;
+  const sub = fighting ? `${left} ${left === 1 ? 'foe remains' : 'foes remain'}`
     : countdown != null ? `${icon('hourglass')}${Math.ceil(countdown)}s<span class="bonus">${icon('coin')}+${Math.round(countdown * EARLY_GOLD_PER_SEC)}</span>`
     : canCall ? (touch ? `Call wave ${n}` : `Call wave ${n} · Space`) : '';
   if ($.hornsub.dataset.v !== sub) { $.hornsub.dataset.v = sub; $.hornsub.innerHTML = sub; }
@@ -521,6 +523,11 @@ function act(a, el, e) {
   if (a === 'diff') return selectDiff(el.dataset.k), bus.emit('ui:click');
   if (a === 'level') return bus.emit('ui:click'), switchLevel(el.dataset.k);
   if (a === 'begin') return bus.emit('ui:click'), startGame();
+  if (a === 'again' && el.classList.contains('pbtn') && !el.classList.contains('armed')) {   // abandoning a run in progress takes a second press
+    el.classList.add('armed'); el.lastChild.textContent = ' Abandon this siege? Press again';
+    clearTimeout(act.t); act.t = setTimeout(() => { el.classList.remove('armed'); el.lastChild.textContent = ' Restart the siege'; }, 3000);
+    return bus.emit('ui:click');
+  }
   if (a === 'again') return bus.emit('ui:click'), restart();
   if (a === 'menu') return bus.emit('ui:click'), location.reload();
   if (a === 'next') { bus.emit('ui:click'); const ids = Object.keys(LEVELS); return switchLevel(ids[ids.indexOf(LEVEL) + 1], diffKey); }
@@ -559,7 +566,11 @@ function setupPointer() {
     if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 7 || performance.now() - down.t > 600 || e.button !== 0) return (down = null);
     down = null;
     if (state.phase !== 'build' && state.phase !== 'wave') return;
-    const hit = pickAt(e.clientX, e.clientY);
+    let hit = pickAt(e.clientX, e.clientY);
+    if (!hit && e.pointerType !== 'mouse') {
+      let best = 24;
+      for (const p of towers.pads) { proj.copy(p.pos).project(camera); const d = Math.hypot((proj.x + 1) / 2 * innerWidth - e.clientX, (1 - proj.y) / 2 * innerHeight - e.clientY); if (proj.z < 1 && d < best) { best = d; hit = p.tower ? { kind: 'tower', tower: p.tower } : { kind: 'pad', pad: p }; } }
+    }
     if (hit && selObj(hit) !== selObj(state.selected)) select(hit); else if (state.selected) deselect();
   });
   el.addEventListener('pointermove', e => { if (e.pointerType === 'mouse') hoverXY = [e.clientX, e.clientY]; });
