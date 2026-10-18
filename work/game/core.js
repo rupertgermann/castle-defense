@@ -1,13 +1,13 @@
-// Shared game state, event bus, and enemy lanes. Every game module imports from here; nothing here imports game modules.
+// Shared game state, event bus, siege, and enemy lanes. Every game module imports from here; nothing here imports other game modules but the siege.
 import { THREE, height, bridgeDeck, gateCenter, lanePaths, laneNames } from '../scene.js';
+import { createSiege, STARTING_GOLD } from './siege.js';
 
 export const state = {
   phase: 'title',      // 'title' | 'build' | 'wave' | 'won' | 'lost'
-  gold: 250,
+  gold: STARTING_GOLD,
   lives: 20,
   maxLives: 20,
   wave: 0,             // number of the current/last started wave (1-based)
-  totalWaves: 15,
   speed: 1,            // 1 | 2 | 3 game-time multiplier
   paused: false,
   time: 0,             // game time in seconds (scaled by speed, stops when paused)
@@ -21,6 +21,9 @@ export const bus = {
   on(name, fn) { if (!listeners.has(name)) listeners.set(name, []); listeners.get(name).push(fn); },
   emit(name, data) { for (const fn of listeners.get(name) || []) fn(data); },
 };
+
+// The siege rules: the only writer of phase, wave, gold and lives.
+export const siege = createSiege({ state, bus });
 
 // Lanes: dense polylines from the world (spawn → gate), resampled with walk heights.
 function walkHeight(x, z) {

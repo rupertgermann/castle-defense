@@ -135,9 +135,10 @@ These checks run without a browser:
 ```bash
 node work/build-test.mjs
 node work/perf-scheduler-test.mjs
+node work/siege-test.mjs
 ```
 
-The build test creates a temporary fixture, builds a custom output, and runs a temporary preview on an ephemeral port. It checks HTTP routes, query parameters, rebuilds, preservation of valid HTML after a syntax error, and recovery. It cleans up its process and temporary files. The scheduler test checks frame timing behavior.
+The build test creates a temporary fixture, builds a custom output, and runs a temporary preview on an ephemeral port. It checks HTTP routes, query parameters, rebuilds, preservation of valid HTML after a syntax error, and recovery. It cleans up its process and temporary files. The scheduler test checks frame timing behavior. The siege test checks the siege rules (waves, horn, gold, keep strength, crowns) against the real wave tables.
 
 The browser tools use Playwright from `devDependencies` in `work/package.json`. Install dependencies with `npm ci --prefix work`, then install Chromium:
 
