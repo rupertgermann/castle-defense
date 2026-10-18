@@ -1,24 +1,18 @@
-# Castle scene
+# Castle Defense project notes
 
-Started 2026-09-30 at 15:44:54 Europe/Berlin, 13:44:54 UTC.
+The game has three battlefields, 15 waves per battlefield, three difficulty settings, tower building and upgrades, procedural audio, and keyboard and touch controls. The playable artifact is `outputs/castle-defense.html`.
 
-- [x] `how` over the affected subsystem. Empty directory, no integration constraints.
-- [x] `architect` for parallel design exploration. Single self-contained scene; direct design under the user's instruction to match ceremony to the task. A bundled Three.js scene preserves actual geometry and offline interaction. A raster panorama cannot satisfy rotation around a model.
-- [x] Write the throughput checkpoint as four todo items.
-  - Blocking first steps. Establish local library bundling and a browser verification route.
-  - Independent workstreams. n/a: one scene and one author avoid mismatched coordinates and materials.
-  - Shared mutable state. One author owns the scene source and final HTML.
-  - Smallest safe decomposition. One author builds geometry, then materials and light, then verifies orbit, zoom, and mobile framing.
-- [x] Delegate code-writing to a subagent. skip: user's single-pass ceremony instruction; one coherent visual artifact owned here.
-- [x] Verify on the matching surface.
-- [x] Rebase into small, ordered commits. skip: standalone file deliverable, no commit requested.
-- [x] If the design is contested, `interrogate` before shipping. skip: no contested design.
-- [x] Run Opening a PR. skip: no repository or PR requested.
+## Development workflow
 
-Scene data shape: deterministic world height function, fortress boundary points, architectural groups, and shared instanced geometry batches. Native OrbitControls owns camera interaction. Everything bundles into one offline HTML file with no visible text.
+The [README](../README.md) contains setup, controls, command options, and verification instructions. The [module contract](game/CONTRACT.md) defines shared state, world data, events, and game APIs.
 
-Acceptance: detailed aerial medieval castle and grounds in warm morning light; real orbit and zoom; no visible words; one HTML with all dependencies embedded; measured start and finish times. Visual inspection plus a browser interaction check must pass.
+- `node work/preview.mjs` builds the game, watches imported sources, and serves the HTML on loopback port 32947.
+- `node work/build.mjs [name] [--watch]` produces a standalone offline HTML file, with an optional persistent watcher.
+- `node work/build-test.mjs` checks building, preview routes, rebuilds, and recovery from source errors in a temporary fixture.
+- `node work/perf-scheduler-test.mjs` checks the render scheduler.
 
-Finished 2026-09-30 at 16:13:02 Europe/Berlin, 14:13:02 UTC. Elapsed 28 minutes 8 seconds.
+## Acceptance
 
-Verified in the actual in-app browser through the user-approved, single-file loopback preview. Mouse orbit and wheel zoom, keyboard orbit and zoom, double-click reset, desktop and 390 x 844 portrait layout, zero visible body text, and zero browser error logs passed. First offline build also passed automated camera, reset, no-network, and no-visible-text assertions. The final bundle has one embedded script and no external asset tags.
+Gameplay changes require exercising the affected player interaction. Visual changes require active gameplay captures and visual inspection across the affected battlefields and viewport sizes. Performance measurements must identify the build and workload measured. Test results do not substitute for visual acceptance.
+
+The preview requires a manual browser reload after rebuilding. Browser automation scripts depend on the local Codex Playwright runtime. `work/verify.mjs` references an absent castle-only artifact and does not verify the game.
