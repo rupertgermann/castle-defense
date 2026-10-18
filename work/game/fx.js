@@ -4,7 +4,6 @@
 import { THREE, scene, camera, controls, renderer, composer, height, bridgeDeck, BASE, world } from '../scene.js';
 import { Pass } from 'three/addons/postprocessing/Pass.js';
 import { state, bus, lanes, gatePoint } from './core.js';
-import * as enemiesMod from './enemies.js';
 import { makeAtlas, FR } from './fx-atlas.js';
 
 const R = Math.random, rr = a => typeof a === 'number' ? a : a[0] + R() * (a[1] - a[0]);
@@ -450,12 +449,11 @@ function towerFire({ tower, from, target, projectile }) {
     default: burst(PR.arrowDust, f.x, f.y, f.z, 1, 2, v1.x, v1.y, v1.z);
   }
 }
-const armorOf = e => e.armor ?? enemiesMod.ENEMY_TYPES?.[e.typeId]?.armor ?? 0;
 function enemyHit({ enemy, pos, damageType }) {
   const p = pos || v2.copy(enemy.pos).setY(enemy.pos.y + enemy.height * .6);
   if (damageType === 'magic') { burst(PR.sparkle, p.x, p.y, p.z, .35, 5); return; }
   if (damageType === 'fire') { burst(PR.ember, p.x, p.y, p.z, 1, 3); burst(PR.flameCore, p.x, p.y - .3, p.z, .35, 1); return; }
-  if (armorOf(enemy) >= .3) { burst(PR.pingStar, p.x, p.y, p.z); burst(PR.ping, p.x, p.y, p.z); }
+  if (enemy.armor >= .3) { burst(PR.pingStar, p.x, p.y, p.z); burst(PR.ping, p.x, p.y, p.z); }
   else { burst(PR.hitDust, p.x, p.y, p.z); burst(PR.ping, p.x, p.y, p.z, .7, 3); }
 }
 function enemyDeath({ enemy, pos }) {
