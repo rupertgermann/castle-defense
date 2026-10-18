@@ -250,7 +250,6 @@ function createAmbience(c, bus, play, winter = false, sea = false) {
 }
 
 // ---------- public API ----------
-const armored = enemy => (enemy.armor ?? enemyModule.ENEMY_TYPES[enemy.typeId]?.armor) >= .3;   // fx's demo sends stand-in foes with their own armor
 const projId = p => typeof p === 'string' ? p : p?.type || p?.kind || p?.id;
 const now = () => ctx ? ctx.currentTime : 0;
 const sfx = (name, opts) => { if (eng && !(paused && (MIX[name]?.bus ?? 'sfx') === 'sfx')) eng.play(name, opts); };
@@ -272,7 +271,7 @@ export function init() {
   bus.on('enemy:heal', ({ pos }) => sfx('arcaneHit', { pos, rate: 1.7, gain: .4 }));   // a bright shimmer: something is mending
   bus.on('enemy:hit', ({ enemy, damageType, pos }) => {
     if (damageType === 'blast' || damageType === 'magic' || damageType === 'fire') return;   // explosion / arcane / fire impact already cover these
-    sfx(armored(enemy) ? 'hitArmor' : 'hitFlesh', { pos: pos || enemy?.pos });
+    sfx(enemy?.armor >= .3 ? 'hitArmor' : 'hitFlesh', { pos: pos || enemy?.pos });
   });
   bus.on('enemy:death', ({ enemy, pos }) => {
     const p = pos || enemy?.pos, boss = enemyModule.ENEMY_TYPES?.[enemy?.typeId]?.boss, h = enemy?.height || 1.8;

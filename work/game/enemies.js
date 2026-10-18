@@ -200,7 +200,7 @@ export function spawnEnemy(typeId, laneIndex, { hpScale = 1 } = {}) {
   const r = Math.random;
   const e = {
     id: nextId++, typeId, hp: maxHp, maxHp, alive: true, lane: laneIndex, dist: 0,
-    pos: new THREE.Vector3(), velocity: new THREE.Vector3(), radius: type.radius, height: type.height, bounty: type.bounty, slowFactor: 1,
+    pos: new THREE.Vector3(), velocity: new THREE.Vector3(), radius: type.radius, height: type.height, bounty: type.bounty, armor: type.armor, slowFactor: 1,
     // internals
     lat: (r() * 2 - 1) * kind.lat, latHome: (r() * 2 - 1) * kind.lat, wander: r() * TAU, phase: r() * TAU, yaw: null,
     flash: 0, stagger: 0, slowUntil: 0, slowDur: 1, age: 0, trail: 1, barA: 0, scale: 1 + (r() * 2 - 1) * kind.vary,
@@ -213,11 +213,12 @@ export function spawnEnemy(typeId, laneIndex, { hpScale = 1 } = {}) {
   return e;
 }
 
-export function damageEnemy(enemy, amount, { type = 'pierce', slow = null } = {}) {
+// The one place armour applies: it blocks its fraction of 'pierce' damage, less the share a bolt's armorPierce ignores.
+export function damageEnemy(enemy, amount, { type = 'pierce', armorPierce = 0, slow = null } = {}) {
   if (!enemy || !enemy.alive) return false;
   renderDirty = true;
   const t = ENEMY_TYPES[enemy.typeId];
-  const dealt = type === 'pierce' ? amount * (1 - t.armor) : amount;
+  const dealt = type === 'pierce' ? amount * (1 - enemy.armor * (1 - armorPierce)) : amount;
   if (slow && slow.factor < 1) {
     const f = t.boss ? Math.max(slow.factor, .6) : slow.factor; // bosses resist slows
     if (state.time >= enemy.slowUntil || f <= enemy.slowFactor) enemy.slowFactor = f;

@@ -548,13 +548,7 @@ function impact(p) {
     }
   } else if (p.target && p.target.alive) {
     if (p.kind === 'arcane') hit(p.target, p.damage, { type: 'magic', slow: p.slow });
-    else {
-      // Ballista armour piercing: pre-scale so that after the enemy's own armour reduction only (1 - armorPierce) of the armour applies.
-      let amount = p.damage;
-      const armor = Math.min(.95, p.target.armor ?? ENEMY_TYPES?.[p.target.typeId]?.armor ?? 0);
-      if (p.armorPierce && armor > 0) amount *= (1 - armor * (1 - p.armorPierce)) / (1 - armor);
-      hit(p.target, amount, { type: 'pierce' });
-    }
+    else hit(p.target, p.damage, { type: 'pierce', armorPierce: p.armorPierce });
   } else if (p.kind !== 'arcane') pos.y = Math.max(groundY(pos.x, pos.z), pos.y - 0);
   bus.emit('projectile:impact', { pos, projectile: p.kind, radius, target: p.target });
 }

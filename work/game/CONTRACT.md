@@ -64,10 +64,10 @@ siege.countdown, siege.pending, siege.waveSize, siege.stats   // read-only
 ```js
 export const ENEMY_TYPES  // { [id]: { name, hp, speed (m/s), bounty (gold), damage (lives), armor (0..1 fraction of 'pierce' damage blocked), radius, height, boss?: bool } }
 export function spawnEnemy(typeId, laneIndex, { hpScale = 1 } = {}) → enemy
-export function damageEnemy(enemy, amount, { type = 'pierce' | 'blast' | 'magic' | 'fire', slow = null /* {factor, duration} */ } = {}) → true if this killed it
+export function damageEnemy(enemy, amount, { type = 'pierce' | 'blast' | 'magic' | 'fire', armorPierce = 0 /* 0..1 share of armor ignored */, slow = null /* {factor, duration} */ } = {}) → true if this killed it. The only place armour applies: 'pierce' deals amount * (1 - armor * (1 - armorPierce)), other types ignore armour
 export function enemiesInRadius(pos, radius) → enemy[]
 ```
-Enemy object: `{ id, typeId, hp, maxHp, alive, lane, dist, pos /*Vector3 feet*/, velocity /*Vector3 m/s*/, radius, height, bounty, slowFactor }`. Aim point = `pos.y + height * .6`.
+Enemy object: `{ id, typeId, hp, maxHp, alive, lane, dist, pos /*Vector3 feet*/, velocity /*Vector3 m/s*/, radius, height, bounty, armor /*copied from its type at spawn*/, slowFactor }`. Aim point = `pos.y + height * .6`.
 Only living enemies are in `state.enemies`. On death: `siege.slain(enemy)`, emit `'enemy:death' {enemy, pos}`. On reaching the gate (`dist >= lane.length`): if `siege.leaked(enemy, damage)`, emit `'enemy:leak' {enemy}`. On hit: emit `'enemy:hit' {enemy, amount, damageType, pos}`. On spawn: `'enemy:spawn' {enemy}`.
 Must hold 60 fps with 80 live enemies (use instancing / merged geometry; skinned-look via procedural limb animation).
 
