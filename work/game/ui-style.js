@@ -280,6 +280,7 @@ position:fixed;inset:0;pointer-events:none;font-family:var(--serif);color:var(--
 #cd .pin b{min-width:22px;height:22px;padding:0 5px;border-radius:11px;display:grid;place-items:center;background:var(--red);color:#fff4d8;font-style:normal;font-size:13px;box-shadow:inset 0 0 0 1px #f0a080}
 #cd .pin::after{content:"";position:absolute;left:50%;bottom:-6px;margin-left:-6px;border:6px solid transparent;border-bottom:0;border-top-color:#23170d}
 #cd .pin[hidden]{display:none}
+#cd.fighting .pin{opacity:.5}   /* in battle the label steps back so the foes beneath it show */
 #cd .breach{position:absolute;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center,transparent 52%,rgba(150,16,8,.55) 100%)}
 #cd .breach.on{animation:cdBreach .9s ease-out}
 @keyframes cdBreach{0%{opacity:0}12%{opacity:1}100%{opacity:0}}
@@ -339,7 +340,7 @@ position:fixed;inset:0;pointer-events:none;font-family:var(--serif);color:var(--
 /* Landscape phones: the card docks to the right edge so the radial menu keeps the rest of the screen. */
 @media (max-width:760px) and (orientation:landscape){#cd .card{left:auto!important;right:8px;top:8px!important;bottom:auto;max-height:calc(100% - 16px);width:270px;overflow:auto}#cd .card .desc{display:none}}
 /* Touch: at least 44 px to hit, whatever the drawn size. */
-@media (pointer:coarse){#cd .ib::after,#cd .card-h .x::after{content:"";position:absolute;inset:-6px}#cd .card-h .x{position:relative}#cd .card-h .x::after{inset:-9px}}
+@media (pointer:coarse){#cd .ctrl{gap:1px;padding:0 2px;height:auto}#cd .ctrl .ib{width:44px;height:44px}#cd .card-h .x{position:relative}#cd .card-h .x::after{content:"";position:absolute;inset:-9px}#cd .pbtn{min-height:46px}#cd .end-card .link{padding:14px 10px}}
 @media (hover:none){#cd .kbd,#cd .how .desk{display:none!important}}
 @media (prefers-reduced-motion:reduce){#cd *,#cd *::before,#cd *::after{animation:none!important;transition:none!important}#cd .banner.show{opacity:1}}
 `;

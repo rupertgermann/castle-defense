@@ -451,7 +451,7 @@ function refreshHud(realDt) {
   const sp = `${icon('speed' + state.speed)}<b>${state.speed}×</b><span class="kbd">F</span>`;
   if ($.speed.dataset.v !== sp) { $.speed.dataset.v = sp; $.speed.innerHTML = sp; $.speed.setAttribute('aria-label', `Game speed ${state.speed}×`); }
   $.speed.classList.toggle('on', state.speed > 1);
-  root.classList.toggle('is-paused', state.paused); root.classList.toggle('has-sel', !!state.selected);
+  root.classList.toggle('is-paused', state.paused); root.classList.toggle('has-sel', !!state.selected); root.classList.toggle('fighting', fighting);
   const pi = state.paused ? 'play' : 'pause';
   if ($.pause.dataset.v !== pi) { $.pause.dataset.v = pi; $.pause.innerHTML = `${icon(pi)}<span class="kbd">P</span>`; $.pause.classList.toggle('on', state.paused); $.pause.dataset.tip = state.paused ? 'Resume' : 'Pause'; $.pause.setAttribute('aria-label', $.pause.dataset.tip); }
   // Contextual hint.
@@ -507,7 +507,8 @@ function toggle(action) {
   else if (action === 'pause') {
     if (state.phase !== 'build' && state.phase !== 'wave') return;
     state.paused = !state.paused;
-    if (state.paused) { deselect(); requestAnimationFrame(() => root.querySelector('.pbtn').focus({ preventScroll: true })); }
+    root.classList.toggle('is-paused', state.paused);   // show the menu now, so its first button can take focus
+    if (state.paused) { deselect(); root.querySelector('.pbtn').focus({ preventScroll: true }); }
     else document.activeElement?.blur();
   }
   else if (action === 'mute') { muted = !muted; localStorage.setItem('cd-muted', muted ? '1' : '0'); showMute(); }
@@ -640,7 +641,8 @@ addEventListener('keydown', e => {
     return;
   }
   if (state.phase === 'won' || state.phase === 'lost') { if (key === 'enter' && $.end.classList.contains('on') && !e.target.closest?.('#cd button')) restart(); return; }
-  if (key === ' ') { e.preventDefault(); callWave(); }
+  if ((key === ' ' || key === 'enter') && e.target.closest?.('#cd button')) return;   // a focused button keeps its own Space/Enter
+  if (key === ' ') { e.preventDefault(); if (!state.paused) callWave(); }
   else if (key === 'p') toggle('pause');
   else if (key === 'f') toggle('speed');
   else if (key === 'm') toggle('mute');

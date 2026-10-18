@@ -156,7 +156,7 @@ function makePips() {
     fragmentShader: `varying float vA; varying float vB;
       void main(){ vec2 p = gl_PointCoord - .5; float d = abs(p.x) + abs(p.y);   // a small diamond
         if (d > .5 || vA < .01) discard;
-        vec3 c = d > .36 ? vec3(.08, .02, .01) : mix(vec3(.95, .2, .1), vec3(1., .75, .3), vB);
+        vec3 c = d > mix(.36, .3, vB) ? vec3(.08, .02, .01) : mix(vec3(.95, .2, .1), vec3(1., .62, .08), vB);
         gl_FragColor = vec4(c, vA * .95); }`,
   });
   const pts = new THREE.Points(geo, mat);
