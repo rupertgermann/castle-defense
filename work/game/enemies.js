@@ -1,6 +1,6 @@
 // Enemies: the invading host. Types, procedural rigged models (instanced per bone), movement along lanes,
 // crowd spreading, hit/slow/death reactions, billboard health bars and blob contact shadows.
-import { THREE, scene, camera, controls, renderer, height, bridgeDeck } from '../scene.js';
+import { THREE, scene, camera, controls, renderer, height, bridgeDeck, world as level } from '../scene.js';
 import { state, bus, lanes } from './core.js';
 import { buildModels } from './enemies-models.js';
 
@@ -16,7 +16,7 @@ export const ENEMY_TYPES = {
   outrider: { name: 'Outrider', tip: 'Armoured lancers that ride twice as fast as men on foot.', hp: 200, speed: 4.8, bounty: 26, damage: 1, armor: .35, radius: 1.0, height: 3.6 },
 };
 // Models are authored at true scale (man ≈ 1.85 m) and drawn 1.6× for readability from the aerial camera.
-const SCALE = 1.6, SEP = SCALE / 1.3;   // crowd spacing follows the drawn size
+const SCALE = 1.6 * (level.unitScale || 1), SEP = SCALE / 1.3;   // big maps (Saltreach) draw their host larger still   // crowd spacing follows the drawn size
 // Internal per-type data: stride (m per gait cycle), lateral spread, shadow footprint, size variation.
 const KIND = {
   raider: { w: .45, l: .45, stride: 1.7, lat: 1.5, shadow: [.75, .75], vary: .05 },

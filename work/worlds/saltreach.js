@@ -495,7 +495,7 @@ export function buildSaltreach(K) {
   const fires = [[-6.5, BASE + 12, 25.6, 1], [0, BASE + 10.2, 23, 1], [6.5, BASE + 12, 25.6, 2], [-14, BASE + 9.5, 22, 2], [14, BASE + 9.5, 22, 2], [18, BASE + 12, -6, 2],
     [-34, BASE + 13, 4, 3], [31, BASE + 12.5, -8, 3], [-2, BASE + 24, -11, 3], [-19, BASE + 11, 2, 3], [-10, BASE + 17, -32, 3]];
   return {
-    height, BASE, gateCenter, sun, terrain, water, treeLocations, exposure: 1.0,
+    height, BASE, gateCenter, sun, terrain, water, treeLocations, exposure: 1.0, unitScale: 1.25,
     bridgeDeck: { x0: Infinity, x1: -Infinity, z: 0, halfWidth: 0, y: 0 },   // no bridge; the causeway is terrain
     lanePaths, laneNames: ['beach landing', 'cliff road', 'causeway'],
     padSpots,

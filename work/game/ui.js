@@ -64,12 +64,12 @@ root.innerHTML = `<style>${CSS}</style>${SPRITE}
   <div class="gsub">${levelInfo.tagline}</div>
   ${fl}
   <div class="maps" role="radiogroup" aria-label="Battlefield">${Object.entries(LEVELS).map(([k, l]) => `
-    <button class="mapbtn leather ${k === LEVEL ? 'sel' : ''}" data-a="level" data-k="${k}" role="radio" aria-checked="${k === LEVEL}">${icon({ castle: 'tower', frostmere: 'peak', saltreach: 'lighthouse' }[k])}<span><b>${l.name}</b><small>${l.place}</small></span><span class="best"></span></button>`).join('')}</div>
+    <button class="mapbtn leather ${k === LEVEL ? 'sel' : ''}" data-a="level" data-k="${k}" role="radio" aria-checked="${k === LEVEL}" tabindex="${k === LEVEL ? 0 : -1}">${icon({ castle: 'tower', frostmere: 'peak', saltreach: 'lighthouse' }[k])}<span><b>${l.name}</b><small>${l.place}</small></span><span class="best"></span></button>`).join('')}</div>
   <div class="diff" role="radiogroup" aria-label="Difficulty">${Object.entries(DIFFS).map(([k, d]) => `
     <button class="dcard leather" data-a="diff" data-k="${k}" role="radio" aria-label="${d.name}: ${d.desc} ${d.lives} keep strength, ${Math.round(BASE_GOLD * d.gold)} starting gold, foes at ${Math.round(d.hp * 100)}% toughness">${icon(d.icon)}<h3>${d.name}</h3><p>${d.desc}</p>
     <div class="m"><span title="Keep strength">${icon('heart')}${d.lives}</span><span title="Starting gold">${icon('coin')}${Math.round(BASE_GOLD * d.gold)}</span><span title="Foe toughness">${icon('skull')}${Math.round(d.hp * 100)}%</span></div></button>`).join('')}</div>
   <button class="cta" data-a="begin">Defend the Keep</button>
-  <div class="how">Raise towers on the stone build sites beside the roads. Sound the horn early for bonus gold.<span class="desk"><br><kbd>Tab</kbd> sites · <kbd>Space</kbd> horn · ${KEYS} build · <kbd>U</kbd> upgrade · <kbd>S</kbd> sell · <kbd>F</kbd> speed · <kbd>P</kbd> pause</span></div>
+  <div class="how">Raise towers on the stone build sites beside the roads. Sound the horn early for bonus gold.<span class="desk"><br><kbd>Tab</kbd> sites · <kbd>O</kbd> overview · <kbd>Space</kbd> horn · ${KEYS} build · <kbd>U</kbd> upgrade · <kbd>S</kbd> sell · <kbd>F</kbd> speed · <kbd>P</kbd> pause</span></div>
 </div>
 <div class="screen end" data-r="end"></div>`;
 document.body.appendChild(root);
@@ -78,13 +78,14 @@ for (const el of root.querySelectorAll('[data-r]')) $[el.dataset.r] = el;
 
 // ── Flow state ──
 let diffKey = 'knight', countdown = null, sched = [], si = 0, waveT = 0, muted = localStorage.getItem('cd-muted') === '1';
+let final = null;
 const stats = { slain: 0, earned: 0, built: 0, leaks: lanes.map(() => 0) }, seen = new Set();
 let hover = null, hoverXY = null, preview = null, lastPointer = 'mouse';
 
 function selectDiff(k) {
   diffKey = k; sessionStorage.setItem('cd-diff', k);
   for (const b of root.querySelectorAll('.mapbtn')) { const n = +localStorage.getItem(`cd-stars:${b.dataset.k}:${k}`) || 0; b.querySelector('.best').innerHTML = n ? icon('crown').repeat(n) : ''; b.querySelector('.best').title = n ? `Best on ${DIFFS[k].name}: ${n} of 3 crowns` : ''; }
-  for (const b of root.querySelectorAll('.dcard')) { b.classList.toggle('sel', b.dataset.k === k); b.setAttribute('aria-checked', b.dataset.k === k); }
+  for (const b of root.querySelectorAll('.dcard')) { b.classList.toggle('sel', b.dataset.k === k); b.setAttribute('aria-checked', b.dataset.k === k); b.tabIndex = b.dataset.k === k ? 0 : -1; }
 }
 selectDiff(DIFFS[sessionStorage.getItem('cd-diff')] ? sessionStorage.getItem('cd-diff') : 'knight');
 
@@ -110,7 +111,7 @@ function callWave() {
   state.wave++; state.phase = 'wave'; countdown = null;
   sched = schedule(state.wave); si = 0; waveT = 0;
   const w = WAVES[state.wave - 1];
-  bus.emit('wave:start', { wave: state.wave });
+  bus.emit('wave:start', { wave: state.wave }); backToFight();
   // A foe type that hasn't marched before (and has a trait worth knowing) gets named in the banner.
   const fresh = composition(state.wave).map(c => c.type).find(t => !seen.has(t) && enemies.ENEMY_TYPES[t].tip);
   for (const c of composition(state.wave)) seen.add(c.type);
@@ -128,8 +129,10 @@ function waveClear() {
   banner(`Wave ${n} repelled`, n === WAVES.length - 1 ? 'The Warlord Approaches' : 'The Line Holds', `${icon('coin')} +${bonus} bounty from the treasury`);
 }
 
+// After keyboard browsing panned the camera away, Esc or the next wave brings back the whole field.
+function backToFight() { if (navMoved) { navMoved = false; flyTo('overview'); } }
 function endGame(won) {
-  state.phase = won ? 'won' : 'lost';
+  state.phase = won ? 'won' : 'lost'; final = { ...stats, lives: state.lives };
   deselect(); flyTo('title');   // the fireworks (or the flames) play out over the keep
   bus.emit(won ? 'game:won' : 'game:lost');
   setTimeout(() => showEnd(won), won ? 1400 : 900);
@@ -157,6 +160,7 @@ function fitAt(az) {
   // Frame the fight, not the far ends of the roads: the first stretch of each road may sit off-screen (its pin stays at the edge).
   for (const lane of lanes) for (let d = lane.length * .28; d <= lane.length; d += 6) pts.push(lane.pointAt(d));
   for (const p of fortPoints) pts.push(new THREE.Vector3(...p));
+  for (const p of towers.pads) pts.push(p.pos);
   const box = new THREE.Box3().setFromPoints(pts), target = box.getCenter(new THREE.Vector3()).setY(6);
   const cam = camera.clone(); cam.clearViewOffset();
   const dir = new THREE.Vector3(Math.sin(az), 0, Math.cos(az)).multiplyScalar(Math.cos(.86)).setY(Math.sin(.86));
@@ -478,7 +482,7 @@ function showEnd(won) {
   const stars = won ? (state.lives >= state.maxLives * .8 ? 3 : state.lives >= state.maxLives * .45 ? 2 : 1) : 0, key = `cd-stars:${LEVEL}:${diffKey}`;
   const best = Math.max(stars, +localStorage.getItem(key) || 0); if (stars) localStorage.setItem(key, best);
   const ids = Object.keys(LEVELS), next = ids[ids.indexOf(LEVEL) + 1];
-  const cells = [['swords', won ? WAVES.length : Math.max(0, state.wave - 1), 'Waves survived'], ['skull', stats.slain, 'Foes slain'], ['coin', stats.earned, 'Gold earned'], ['tower', stats.built, 'Towers raised']];
+  const f = final || stats, cells = [['swords', won ? WAVES.length : Math.max(0, state.wave - 1), 'Waves survived'], ['skull', f.slain, 'Foes slain'], ['coin', f.earned, 'Gold earned'], ['tower', f.built, 'Towers raised']];
   $.end.className = `screen end on ${won ? 'won' : 'lost'}`;
   root.classList.add('ended'); controls.autoRotate = !reduced;
   $.end.innerHTML = `<div class="end-card parch"><div class="end-top"><div class="medal">${icon(won ? 'crown' : 'skull')}</div></div>
@@ -566,14 +570,21 @@ function setupPointer() {
 // jump to the nearest site in that direction on screen. The camera eases over to keep the choice in view.
 const siteSel = p => p.tower ? { kind: 'tower', tower: p.tower } : { kind: 'pad', pad: p };
 const toScreen = v => { proj.copy(v).project(camera); return [proj.x * innerWidth / 2, -proj.y * innerHeight / 2]; };
-let lastSite = null;   // so Tab after building carries on from the site just used
+let lastSite = null, navMoved = false;   // so Tab after building carries on from the site just used
+// Tab walks each road from the gate outward, one road after another (sites shared by roads go with the nearest).
+let siteOrder;
+function orderSites() {
+  const v = new THREE.Vector3();
+  const key = p => { let best = [0, 1e9, 0]; lanes.forEach((l, i) => { for (let d = 0; d <= l.length; d += 2) { l.pointAt(d, v); const k = Math.hypot(v.x - p.pos.x, v.z - p.pos.z); if (k < best[1]) best = [i, k, l.length - d]; } }); return best[0] * 1e4 + best[2]; };
+  const keys = new Map(towers.pads.map(p => [p, key(p)]));
+  siteOrder = [...towers.pads].sort((a, b) => keys.get(a) - keys.get(b));
+}
 function keyNav(step, dir) {
   const pads = towers.pads, cur = selObj(state.selected)?.pad || selObj(state.selected) || lastSite;
   let next;
   if (!cur) next = pads.reduce((b, p) => Math.hypot(...toScreen(p.pos)) < Math.hypot(...toScreen(b.pos)) ? p : b);
   else if (step) {
-    const ang = p => Math.atan2(p.pos.x - gatePoint.x, p.pos.z - gatePoint.z), ring = [...pads].sort((a, b) => ang(a) - ang(b));
-    next = ring[(ring.indexOf(cur) + step + ring.length) % ring.length];
+    next = siteOrder[(siteOrder.indexOf(cur) + step + siteOrder.length) % siteOrder.length];
   } else {
     const [cx, cy] = toScreen(cur.pos);
     let best = Infinity;
@@ -588,10 +599,18 @@ function keyNav(step, dir) {
   const [x, y] = toScreen(next.pos);
   if (Math.abs(x) > innerWidth * .38 || Math.abs(y) > innerHeight * .33) {
     const s0 = new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target));
-    tween = { t: 0, dur: .6, t0: controls.target.clone(), t1: next.pos.clone(), s0, s1: s0, dth: 0 };
+    tween = { t: 0, dur: .6, t0: controls.target.clone(), t1: next.pos.clone(), s0, s1: s0, dth: 0 }; navMoved = true;
   }
 }
 const ARROWS = { arrowleft: [-1, 0], arrowright: [1, 0], arrowup: [0, -1], arrowdown: [0, 1] };
+// Open dialogs (pause, end screen) keep Tab cycling through their own buttons.
+addEventListener('keydown', e => {
+  if (e.key !== 'Tab') return;
+  const dlg = $.end.classList.contains('on') ? $.end : state.paused ? root.querySelector('.paused') : null; if (!dlg) return;
+  const b = [...dlg.querySelectorAll('button')]; if (!b.length) return;
+  const i = b.indexOf(document.activeElement), n = i < 0 ? 0 : (i + (e.shiftKey ? -1 : 1) + b.length) % b.length;
+  e.preventDefault(); e.stopImmediatePropagation(); b[n].focus();
+}, true);
 // Capture phase: with a site selected, arrows navigate instead of orbiting the camera (scene.js listens on the canvas).
 addEventListener('keydown', e => {
   if ((state.phase !== 'build' && state.phase !== 'wave') || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -611,7 +630,11 @@ addEventListener('keydown', e => {
       const ks = Object.keys(DIFFS), k = ks[(ks.indexOf(btn.dataset.k) + (key === 'arrowright' ? 1 : ks.length - 1)) % ks.length];
       e.preventDefault(); selectDiff(k); root.querySelector(`.dcard[data-k=${k}]`).focus(); return;
     }
-    if (key === ' ' && btn || key === 'enter' && btn?.dataset.a === 'level') return;
+    if (btn?.dataset.a === 'level' && (key === 'arrowleft' || key === 'arrowright')) {   // focus moves; Space switches level
+      const bs = [...root.querySelectorAll('.mapbtn')], k = (bs.indexOf(btn) + (key === 'arrowright' ? 1 : bs.length - 1)) % bs.length;
+      e.preventDefault(); for (const b of bs) b.tabIndex = -1; bs[k].tabIndex = 0; bs[k].focus(); return;
+    }
+    if (key === ' ' && btn) return;
     if (key === 'enter' || key === ' ') { e.preventDefault(); if (btn?.dataset.a === 'diff') selectDiff(btn.dataset.k); startGame(); }
     return;
   }
@@ -620,7 +643,7 @@ addEventListener('keydown', e => {
   else if (key === 'p') toggle('pause');
   else if (key === 'f') toggle('speed');
   else if (key === 'm') toggle('mute');
-  else if (key === 'escape') { if (state.selected) deselect(); else toggle('pause'); }
+  else if (key === 'escape') { if (state.selected) { deselect(); backToFight(); } else toggle('pause'); }
   else if (key === 'u') upgrade();
   else if (key === 's') sell();
   else if (key >= '1' && key <= '9' && TOWER_IDS[key - 1]) {
@@ -634,7 +657,7 @@ addEventListener('keydown', e => {
 
 // ── Module API ──
 export function init() {
-  setupCamera(); setupPointer(); showMute();
+  setupCamera(); setupPointer(); showMute(); orderSites();
   // Leaving the tab mid-siege: come back to the pause menu rather than straight into the fight.
   document.addEventListener('visibilitychange', () => { if (document.hidden && !state.paused) toggle('pause'); });
   bus.on('enemy:death', ({ enemy }) => { stats.slain++; stats.earned += enemy?.bounty || 0; });
