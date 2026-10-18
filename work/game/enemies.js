@@ -147,12 +147,12 @@ function makePips() {
   geo.setAttribute('size', new THREE.BufferAttribute(new Float32Array(cap), 1).setUsage(THREE.DynamicDrawUsage));
   const mat = new THREE.ShaderMaterial({
     transparent: true, depthTest: false, depthWrite: false,
-    uniforms: { uScale: { value: 450 }, uPR: { value: 1 } },
-    vertexShader: `attribute float size; uniform float uScale, uPR; varying float vA; varying float vB;
+    uniforms: { uScale: { value: 450 }, uPR: { value: 1 }, uVH: { value: 1 } },
+    vertexShader: `attribute float size; uniform float uScale, uPR, uVH; varying float vA; varying float vB;
       void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.); gl_Position = projectionMatrix * mv;
         float body = abs(size) * projectionMatrix[1][1] * uScale / -mv.z;   // size < 0 marks a boss      // the model's height on screen, in px
         vA = 1. - smoothstep(16. * uPR, 30. * uPR, body); vB = step(size, 0.);
-        gl_PointSize = mix(7., 10., vB) * uPR; }`,
+        gl_PointSize = mix(10., 14., vB) * uPR * uVH; }`,
     fragmentShader: `varying float vA; varying float vB;
       void main(){ vec2 p = gl_PointCoord - .5; float d = abs(p.x) + abs(p.y);   // a small diamond
         if (d > .5 || vA < .01) discard;
@@ -249,9 +249,10 @@ function kill(e) {
 }
 function leak(e) {
   e.alive = false; remove(e);
-  state.lives -= ENEMY_TYPES[e.typeId].damage;
   e.ghost = 'leak'; e.gt = 0;
   ghosts.push(e);
+  if (state.phase !== 'wave') return;   // once the keep has fallen, stragglers just walk in
+  state.lives = Math.max(0, state.lives - ENEMY_TYPES[e.typeId].damage);
   bus.emit('enemy:leak', { enemy: e });
 }
 
@@ -448,7 +449,7 @@ function render() {
   shadows.instanceMatrix.needsUpdate = true; shadows.alpha.needsUpdate = true;
   const pg = pips.geometry;
   pg.attributes.position.needsUpdate = true; pg.attributes.size.needsUpdate = true; pg.setDrawRange(0, pips.n);
-  pips.material.uniforms.uPR.value = renderer.getPixelRatio(); pips.material.uniforms.uScale.value = renderer.domElement.height / 2;
+  pips.material.uniforms.uPR.value = renderer.getPixelRatio(); pips.material.uniforms.uVH.value = THREE.MathUtils.clamp(innerHeight / 700, 1, 1.6); pips.material.uniforms.uScale.value = renderer.domElement.height / 2;
   const bg = bars.geometry;
   bg.attributes.position.needsUpdate = true; bg.attributes.bar.needsUpdate = true; bg.setDrawRange(0, bars.n);
   bars.material.uniforms.uPR.value = renderer.getPixelRatio();

@@ -635,6 +635,7 @@ addEventListener('keydown', e => {
       e.preventDefault(); for (const b of bs) b.tabIndex = -1; bs[k].tabIndex = 0; bs[k].focus(); return;
     }
     if (key === ' ' && btn) return;
+    if (key === 'enter' && btn?.dataset.a === 'level' && btn.dataset.k !== LEVEL) { e.preventDefault(); return switchLevel(btn.dataset.k, diffKey); }   // begin the level you're looking at
     if (key === 'enter' || key === ' ') { e.preventDefault(); if (btn?.dataset.a === 'diff') selectDiff(btn.dataset.k); startGame(); }
     return;
   }

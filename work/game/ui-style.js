@@ -338,6 +338,8 @@ position:fixed;inset:0;pointer-events:none;font-family:var(--serif);color:var(--
 @keyframes cdSheet{0%{transform:translateY(40px);opacity:0}}
 /* Landscape phones: the card docks to the right edge so the radial menu keeps the rest of the screen. */
 @media (max-width:760px) and (orientation:landscape){#cd .card{left:auto!important;right:8px;top:8px!important;bottom:auto;max-height:calc(100% - 16px);width:270px;overflow:auto}#cd .card .desc{display:none}}
+/* Touch: at least 44 px to hit, whatever the drawn size. */
+@media (pointer:coarse){#cd .ib::after,#cd .card-h .x::after{content:"";position:absolute;inset:-6px}#cd .card-h .x{position:relative}#cd .card-h .x::after{inset:-9px}}
 @media (hover:none){#cd .kbd,#cd .how .desk{display:none!important}}
 @media (prefers-reduced-motion:reduce){#cd *,#cd *::before,#cd *::after{animation:none!important;transition:none!important}#cd .banner.show{opacity:1}}
 `;
