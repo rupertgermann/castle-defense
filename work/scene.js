@@ -307,14 +307,20 @@ composer.addPass(grade); composer.addPass(new OutputPass());
 const fxaa = new ShaderPass(FXAAShader); composer.addPass(fxaa);
 
 const start = performance.now();
-let lastFrame = start, frameCount = 0;
+const frameInterval = 1000 / 60;
+let lastFrame = start, nextFrame = start + frameInterval, frameCount = 0;
+document.addEventListener('visibilitychange', () => {
+  lastFrame = performance.now(); nextFrame = lastFrame + frameInterval;
+});
 // Game systems register here; called every frame with (dt seconds, elapsed seconds).
 export const frameHooks = [];
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 function render(now) {
   requestAnimationFrame(render);
-  if (document.hidden) { lastFrame = now; return; }
-  if (now - lastFrame < 15) return; // cap at ~60fps; 120Hz displays would otherwise run every post pass twice as often
+  if (document.hidden) { lastFrame = now; nextFrame = now + frameInterval; return; }
+  if (now + .1 < nextFrame) return;
+  // Keep the scheduling remainder without feeding it into simulation time.
+  nextFrame += Math.max(1, Math.floor((now - nextFrame) / frameInterval) + 1) * frameInterval;
   const dt = Math.min(.1, Math.max(0, now - lastFrame) * .001);
   lastFrame = now;
   const time = (now - start) * .001;
