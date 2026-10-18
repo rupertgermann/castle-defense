@@ -282,7 +282,7 @@ function showRange(center, range, color, minRange = 0) {
 }
 
 // ---------------- targeting ----------------
-const laneOf = e => typeof e.lane === 'number' ? lanes[e.lane] : e.lane;
+const laneOf = e => lanes[e.lane];
 const remaining = e => { const l = laneOf(e); return (l ? l.length : 0) - (e.dist || 0); };
 const aimPoint = (e, out) => out.copy(e.pos).setY(e.pos.y + (e.height || 1.6) * .6);
 // Lobbed shots (bombard, pitch, trebuchet) predict along the road itself, so curves and the gate don't throw them off.

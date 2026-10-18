@@ -250,10 +250,7 @@ function createAmbience(c, bus, play, winter = false, sea = false) {
 }
 
 // ---------- public API ----------
-const armored = enemy => {
-  const a = enemyModule.ENEMY_TYPES?.[enemy?.typeId]?.armor;
-  return a != null ? a >= .3 : /knight|armou?r|man.?at.?arms|paladin/i.test(enemy?.typeId || '');
-};
+const armored = enemy => (enemy.armor ?? enemyModule.ENEMY_TYPES[enemy.typeId]?.armor) >= .3;   // fx's demo sends stand-in foes with their own armor
 const projId = p => typeof p === 'string' ? p : p?.type || p?.kind || p?.id;
 const now = () => ctx ? ctx.currentTime : 0;
 const sfx = (name, opts) => { if (eng && !(paused && (MIX[name]?.bus ?? 'sfx') === 'sfx')) eng.play(name, opts); };
