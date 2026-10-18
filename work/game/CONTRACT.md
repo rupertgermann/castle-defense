@@ -13,7 +13,8 @@ Quality bar: AAA. A harsh visual critic will review screenshots of your work and
 | `work/game/siege.js` | orchestrator | Siege rules: phase, waves, countdown, horn, gold, keep strength, win/lose, crowns. Imports nothing that loads the scene; tested in Node by `work/siege-test.mjs`. |
 | `work/game/main.js` | orchestrator | Calls `init()` on all modules, then each frame spawns what `siege.tick(dt)` returns, then `ui.update(dt, realDt)`, `enemies.update(dt)`, `towers.update(dt)`, `fx.update(dt, realDt)`, `audio.update(dt, realDt)`. `dt` is game time (0 when paused, ×speed). |
 | `work/game/enemies.js` | enemies agent | Enemy types, models, animation, movement, health bars, death. |
-| `work/game/towers.js` | towers agent | Build pads, tower types, models, upgrades, targeting, projectiles + damage. |
+| `work/game/towers.js` | towers agent | View adapter: build sites, models posed from the rules state, projectiles and fire-pool glows, picking and highlights. |
+| `work/game/towers-rules.js` | towers agent | Tower rules for six tower types: build/upgrade/sell economy, targeting, turning, leading, projectile flight, impacts, fire pools. Imports nothing that loads the scene; tested in Node by `work/towers-test.mjs`. |
 | `work/game/fx.js` | fx agent | Particles, explosions, impacts, floating numbers, screen shake, castle damage visuals. Event-driven only. |
 | `work/game/audio.js` | audio agent | All sound, procedural WebAudio (no files; must work offline). Event-driven only. |
 | `work/game/ui.js` (+ `work/game/waves.js`) | ui agent | HUD (DOM overlay), title/victory/defeat screens, input + selection, build/upgrade menus, banners, camera framing. `waves.js` is pure data and must not import the scene or the page. |
@@ -66,6 +67,7 @@ export const ENEMY_TYPES  // { [id]: { name, hp, speed (m/s), bounty (gold), dam
 export function spawnEnemy(typeId, laneIndex, { hpScale = 1 } = {}) → enemy
 export function damageEnemy(enemy, amount, { type = 'pierce' | 'blast' | 'magic' | 'fire', armorPierce = 0 /* 0..1 share of armor ignored */, slow = null /* {factor, duration} */ } = {}) → true if this killed it. The only place armour applies: 'pierce' deals amount * (1 - armor * (1 - armorPierce)), other types ignore armour
 export function enemiesInRadius(pos, radius) → enemy[]
+export function distAfter(enemy, T) → number  // road distance after T s at its current pace (the same formula its movement uses)
 ```
 Enemy object: `{ id, typeId, hp, maxHp, alive, lane, dist, pos /*Vector3 feet*/, velocity /*Vector3 m/s*/, radius, height, bounty, armor /*copied from its type at spawn*/, slowFactor }`. Aim point = `pos.y + height * .6`.
 Only living enemies are in `state.enemies`. On death: `siege.slain(enemy)`, emit `'enemy:death' {enemy, pos}`. On reaching the gate (`dist >= lane.length`): if `siege.leaked(enemy, damage)`, emit `'enemy:leak' {enemy}`. On hit: emit `'enemy:hit' {enemy, amount, damageType, pos}`. On spawn: `'enemy:spawn' {enemy}`.
@@ -74,7 +76,7 @@ Must hold 60 fps with 80 live enemies (use instancing / merged geometry; skinned
 ## towers.js
 
 ```js
-export const TOWER_TYPES  // { [id]: { name, description, damageType, levels: [{ cost, damage, range, rate /*shots per s*/, splash?, slow? }, ×3] } }
+export const TOWER_TYPES  // { [id]: { name, description, damageType, projectile, turn /*radians per s*/, levels: [{ cost, damage, range, minRange?, rate /*shots per s*/, splash?, slow?, armorPierce?, burn? }, ×3] } }
 export const pads          // [{ id, pos: Vector3, tower: null|tower }]
 export function buildTower(pad, typeId) → tower|null  // deducts gold, emits 'tower:build' {tower}
 export function upgradeCost(tower) → number|null        // null at max level
@@ -84,9 +86,10 @@ export function sellTower(tower)                        // refunds, emits 'tower
 export function pick(raycaster) → { kind: 'pad', pad } | { kind: 'tower', tower } | null
 export function setHighlight(selection /* same shape as pick() */, previewTypeId?)  // range ring, hover/selected glow, ghost preview
 ```
-Tower object: `{ id, typeId, level /*0..2*/, pad, pos, range, target, kills, spent }`, stored in `state.towers`.
-Towers own projectile flight and call `damageEnemy`. Emit `'tower:fire' {tower, from: Vector3, target, projectile}` and `'projectile:impact' {pos, projectile, radius, target}`. Projectile ids: `'arrow' | 'cannonball' | 'arcane' | 'bolt' | 'firepot'` (towers agent may add more; document them in your report).
-`'firepot'` (Pitch Cauldron) impacts carry `duration`: the pool burns for that long and towers deal `'fire'` damage (ignores armour) to foes inside, in 0.25 s ticks. FX draws the flames, towers draw the ground glow.
+Six tower types: archer, cannon, mage, ballista, cauldron, trebuchet. `TOWER_TYPES`, `upgradeCost` and `sellValue` live in `towers-rules.js`; towers.js re-exports them.
+Tower object: `{ id, typeId, level /*0..2*/, pad, pos, range, target, kills, spent, cooldown, yaw, sold }`, stored in `state.towers`. View state (model, animation, recoil, trails) stays in towers.js.
+`createTowerRules({ state, bus, siege, host, lanes, muzzle, groundY })` owns the rules; host is `{ foes(), damage(e, n, opts), inRadius(pos, r), distAfter(e, T) }` (enemies.js in the game, fakes in the test). Impacts deal the tower type's `damageType`. Emit `'tower:fire' {tower, from: Vector3, target, projectile}` and `'projectile:impact' {pos, projectile, radius, target}`. Projectile ids: `'arrow' | 'cannonball' | 'arcane' | 'bolt' | 'firepot' | 'boulder'`.
+`'firepot'` (Pitch Cauldron) impacts carry `duration`: the pool burns for that long and towers deal `'fire'` damage (ignores armour) in 0.25 s ticks to foes within `radius + e.radius·.5`, from the hottest pool only. FX draws the flames, towers draw the ground glow.
 
 ## fx.js / audio.js
 
@@ -116,6 +119,7 @@ node work/build.mjs [name] [--watch]
 node work/build-test.mjs
 node work/perf-scheduler-test.mjs
 node work/siege-test.mjs
+node work/towers-test.mjs
 ```
 
 The preview builds `outputs/castle-defense.html`, watches imported game sources, and serves the file at `http://127.0.0.1:32947/` and `/castle-defense.html`. Both routes accept level query parameters. Reload the browser after a successful build. Restart the process after editing the build or preview script.

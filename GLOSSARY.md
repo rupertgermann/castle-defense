@@ -55,3 +55,25 @@ _Avoid_: reward, loot
 **Clear bonus**:
 Gold paid for repelling a wave.
 _Avoid_: wave reward
+
+### Towers
+
+**Tower**:
+A war engine the player raises on a build site; it has a type and three levels, and can be upgraded or sold.
+_Avoid_: turret, defence, building
+
+**Build site**:
+One of the fixed places beside the roads where a tower can stand, at most one tower each.
+_Avoid_: pad, slot, plot
+
+**Splash**:
+Damage spread over every foe within a radius of where a shot lands, weaker toward the edge.
+_Avoid_: AoE, area damage
+
+**Fire pool**:
+A patch of burning pitch left by a Pitch Cauldron shot that scorches every foe standing in it for a while; overlapping pools don't add up.
+_Avoid_: burning, puddle, burn zone
+
+**Dead zone**:
+The ring around a Trebuchet too close for it to strike.
+_Avoid_: min range, blind spot
