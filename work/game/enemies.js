@@ -30,6 +30,7 @@ const KIND = {
 };
 
 let models, material, bars, shadows, pips, nextId = 1;
+let renderDirty = true;
 const bossPips = [];
 const ghosts = []; // dying / leaking enemies still animating
 const PI = Math.PI, TAU = PI * 2;
@@ -207,12 +208,14 @@ export function spawnEnemy(typeId, laneIndex, { hpScale = 1 } = {}) {
   };
   place(e, 0);
   state.enemies.push(e);
+  renderDirty = true;
   bus.emit('enemy:spawn', { enemy: e });
   return e;
 }
 
 export function damageEnemy(enemy, amount, { type = 'pierce', slow = null } = {}) {
   if (!enemy || !enemy.alive) return false;
+  renderDirty = true;
   const t = ENEMY_TYPES[enemy.typeId];
   const dealt = type === 'pierce' ? amount * (1 - t.armor) : amount;
   if (slow && slow.factor < 1) {
@@ -323,6 +326,7 @@ function separate(dt) {
 export function update(dt) {
   if (!models) return;
   if (dt > 0) {
+    renderDirty = true;
     for (const e of state.enemies.slice()) {
       const t = ENEMY_TYPES[e.typeId], k = KIND[e.typeId];
       e.age += dt;
@@ -440,6 +444,11 @@ const _cr = new THREE.Matrix4(), _cm = new THREE.Matrix4();
 
 // ---------------------------------------------------------------- per-frame render
 function render() {
+  pips.material.uniforms.uPR.value = renderer.getPixelRatio(); pips.material.uniforms.uVH.value = THREE.MathUtils.clamp(innerHeight / 700, 1, 1.6); pips.material.uniforms.uScale.value = renderer.domElement.height / 2;
+  bars.material.uniforms.uPR.value = renderer.getPixelRatio();
+  bars.material.uniforms.uScale.value = renderer.domElement.height / 2;
+  if (!renderDirty) return;
+  renderDirty = false;
   for (const m of Object.values(models)) for (const mesh of m.meshes) mesh.count = 0;
   bars.n = 0; pips.n = 0; shadows.count = 0;
   bossPips.length = 0;
@@ -447,16 +456,24 @@ function render() {
   for (const [x, y, z, h] of bossPips) if (pips.n < pips.cap) { const i = pips.n++; pips.geometry.attributes.position.array.set([x, y, z], i * 3); pips.geometry.attributes.size.array[i] = -h; }   // bosses last, on top of their escort
   for (const g of ghosts) draw(g);
   for (const m of Object.values(models)) for (const mesh of m.meshes) {
-    mesh.instanceMatrix.needsUpdate = true; mesh.fx.needsUpdate = true; mesh.instanceColor.needsUpdate = true;
+    if (!mesh.count) continue;
+    for (const a of [mesh.instanceMatrix, mesh.fx, mesh.instanceColor]) {
+      a.clearUpdateRanges(); a.addUpdateRange(0, mesh.count * a.itemSize); a.needsUpdate = true;
+    }
   }
-  shadows.instanceMatrix.needsUpdate = true; shadows.alpha.needsUpdate = true;
+  if (shadows.count) for (const a of [shadows.instanceMatrix, shadows.alpha]) {
+    a.clearUpdateRanges(); a.addUpdateRange(0, shadows.count * a.itemSize); a.needsUpdate = true;
+  }
   const pg = pips.geometry;
-  pg.attributes.position.needsUpdate = true; pg.attributes.size.needsUpdate = true; pg.setDrawRange(0, pips.n);
-  pips.material.uniforms.uPR.value = renderer.getPixelRatio(); pips.material.uniforms.uVH.value = THREE.MathUtils.clamp(innerHeight / 700, 1, 1.6); pips.material.uniforms.uScale.value = renderer.domElement.height / 2;
+  pg.setDrawRange(0, pips.n);
+  if (pips.n) for (const a of [pg.attributes.position, pg.attributes.size]) {
+    a.clearUpdateRanges(); a.addUpdateRange(0, pips.n * a.itemSize); a.needsUpdate = true;
+  }
   const bg = bars.geometry;
-  bg.attributes.position.needsUpdate = true; bg.attributes.bar.needsUpdate = true; bg.setDrawRange(0, bars.n);
-  bars.material.uniforms.uPR.value = renderer.getPixelRatio();
-  bars.material.uniforms.uScale.value = renderer.domElement.height / 2;
+  bg.setDrawRange(0, bars.n);
+  if (bars.n) for (const a of [bg.attributes.position, bg.attributes.bar]) {
+    a.clearUpdateRanges(); a.addUpdateRange(0, bars.n * a.itemSize); a.needsUpdate = true;
+  }
 }
 
 function draw(e) {

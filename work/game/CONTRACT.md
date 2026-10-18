@@ -1,6 +1,6 @@
 # Castle Defense — module contract
 
-A tower-defense game with three levels (see Levels and worlds). **The castle, terrain, river, bridge, village, trees and lighting of Dawnhold must keep their current look.** Game content is added on top and must match that look: same warm morning light, same stone materials (`materials.stone/trim/base` from scene.js), grounded, detailed, believable medieval — not toy-like, not neon.
+A tower-defense game with three levels (see Levels and worlds). **The castle, terrain, river, bridge, village, trees and lighting of Dawnhold must keep their current look.** Game content must match that look: same warm morning light, same stone materials (`materials.stone/trim/base` from scene.js), grounded, detailed, believable medieval — not toy-like, not neon.
 
 Quality bar: AAA. A harsh visual critic will review screenshots of your work and send it back until it is genuinely impressive.
 
@@ -17,7 +17,7 @@ Quality bar: AAA. A harsh visual critic will review screenshots of your work and
 | `work/game/audio.js` | audio agent | All sound, procedural WebAudio (no files; must work offline). Event-driven only. |
 | `work/game/ui.js` (+ `work/game/waves.js`) | ui agent | HUD (DOM overlay), title/victory/defeat screens, input + selection, build/upgrade menus, wave flow, camera framing. |
 
-You may add helper files named `work/game/<yourmodule>-*.js`. Never edit another owner's file; if you need something from another module, code against this contract (it may still be a stub while you work) and mention the need in your report.
+You may add helper files named `work/game/<yourmodule>-*.js`. Never edit another owner's file; if you need something from another module, code against this contract and mention the need in your report.
 
 ## Levels and worlds
 
@@ -37,7 +37,7 @@ You may add helper files named `work/game/<yourmodule>-*.js`. Never edit another
 ```js
 state = { phase: 'title'|'build'|'wave'|'won'|'lost', gold, lives, maxLives, wave, totalWaves, speed, paused, time, enemies: [], towers: [], selected }
 bus.on(name, fn); bus.emit(name, data)
-lanes[0] = south (village road → gate), lanes[1] = east (east road → bridge → gate)
+lanes = paths from the selected world; lane names and counts vary by level
 lane.length; lane.pointAt(d, target?) → Vector3 on the ground (d = metres from spawn); lane.directionAt(d, target?) → unit horizontal Vector3
 gatePoint: Vector3 at the castle gate
 ```
@@ -86,13 +86,33 @@ Each module exports `debug` with helpers, reachable as `__game.<module>.debug` i
 - enemies: `debug.spawnMany(typeId, lane, count)`
 - towers: `debug.buildAll()` (a mix of tower types/levels on most pads)
 - fx: `debug.demo()` (fires a representative burst of every effect around the visible area)
+- audio: `debug.report()` (offline sound and mix measurements)
 - ui: `debug.start()` (skip title → build phase), `debug.skipToWave(n)`, `debug.give(gold)`
 
-## Build and look
+## Build and preview
 
-From the project root (`/Users/rupertgermann/Documents/Codex/2026-09-30/can-you-generate-an-aerial-view-2`, or your worktree root):
+Run commands from the repository root. Install dependencies with `npm ci --prefix work`.
+
+```bash
+node work/preview.mjs
+node work/build.mjs [name] [--watch]
+node work/build-test.mjs
+node work/perf-scheduler-test.mjs
 ```
-node work/build.mjs <yourname>        # → outputs/<yourname>.html (single offline file)
-node work/shot.mjs <yourname> work/shots/<yourname>/x.png --size 1600x900 --eval "<js>" --wait 3000
+
+The preview builds `outputs/castle-defense.html`, watches imported game sources, and serves the file at `http://127.0.0.1:32947/` and `/castle-defense.html`. Both routes accept level query parameters. Reload the browser after a successful build. Restart the process after editing the build or preview script.
+
+The standalone builder defaults to the name `castle-defense`. A custom name produces `outputs/<name>.html`. `--watch` keeps the builder running without an HTTP server. esbuild starts at `work/game/main.js`; only files in its dependency graph are watched. Unrelated scripts and documentation do not trigger rebuilds. Successful builds replace the HTML through a temporary file and rename. Failed rebuilds leave the last successful HTML available and recover when the source is fixed. An initial build failure exits.
+
+The browser runs the bundled HTML without loading files from `work/`. Three.js, styles, and shaders are embedded, and game assets are generated in code. Generated HTML is not an editing source.
+
+## Visual verification
+
+```bash
+node work/build.mjs dev-review
+node work/shot.mjs dev-review work/shots/dev-review/title.png --size 1600x900 --wait 3000
 ```
-shot.mjs prints fps and console errors/warnings. Always look at your screenshots (Read the png). Zero console errors required. The two `sigmaRadians` warnings are pre-existing, ignore them.
+
+`shot.mjs` also accepts `--eval "<js>"` to prepare a scene before capture. It reports frame statistics and console errors or warnings. Inspect the screenshots and exercise the changed gameplay path. Browser tools depend on the absolute Playwright path in the local Codex runtime and a Chromium installation.
+
+The [README](../../README.md#verify-changes) lists gameplay, audio, UX, and performance commands and their options. `work/verify.mjs` targets the absent castle-only HTML and is not a game acceptance check.

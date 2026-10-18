@@ -516,7 +516,15 @@ function updateProjectiles(dt) {
     if (p.kind === 'boulder') { dummy.quaternion.setFromAxisAngle(p.spin, p.t * 5); dummy.scale.setScalar(1); }
     dummy.updateMatrix(); pool.setMatrixAt(counts[p.kind]++, dummy.matrix);
   }
-  for (const k in pools) { pools[k].count = counts[k]; pools[k].instanceMatrix.needsUpdate = true; if (pools[k].instanceColor) pools[k].instanceColor.needsUpdate = true; }
+  for (const k in pools) {
+    const pool = pools[k];
+    pool.count = counts[k];
+    if (!pool.count) continue;
+    for (const a of [pool.instanceMatrix, pool.instanceColor]) {
+      if (!a) continue;
+      a.clearUpdateRanges(); a.addUpdateRange(0, pool.count * a.itemSize); a.needsUpdate = true;
+    }
+  }
 }
 const _zAxis = new THREE.Vector3(0, 0, 1);
 function impact(p) {
