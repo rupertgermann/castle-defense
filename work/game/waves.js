@@ -1,6 +1,4 @@
-// Wave tables (one per level) + spawn schedule. Pure data/logic, edit freely.
-import { LEVEL } from '../level.js';
-import { lanePaths } from '../scene.js';
+// Wave tables (one per level) + spawn schedule. Pure data/logic (no scene, no page), edit freely.
 // Group: { type, count, lane: index into the level's lanes | 'alt' (round-robin over all lanes), at: first spawn (s from wave start), every: gap (s), hp?: extra hp multiplier }
 const CASTLE_WAVES = [
   { name: 'Smoke on the Road', groups: [
@@ -198,9 +196,9 @@ const SALT_WAVES = [
     { type: 'warlord', count: 1, lane: 1, at: 22, every: 1, hp: .7 },
     { type: 'hound', count: 21, lane: 'alt', at: 20, every: .33 }] },
 ];
-export const WAVES = { frostmere: FROST_WAVES, saltreach: SALT_WAVES }[LEVEL] || CASTLE_WAVES;
+export const WAVES_BY_LEVEL = { castle: CASTLE_WAVES, frostmere: FROST_WAVES, saltreach: SALT_WAVES };
 // Frostmere's lanes are long, so its hosts are hardier to keep it the harder siege.
-const LEVEL_HP = LEVEL === 'frostmere' ? 1.35 : 1;
+export const LEVEL_HP = { frostmere: 1.35 };
 
 // Wave-wide hp multiplier (1-based wave number).
 export const hpScale = n => 1 + .1 * (n - 1) + .006 * (n - 1) ** 2;
@@ -209,18 +207,19 @@ export const clearBonus = n => 20 + n * 6;
 export const EARLY_GOLD_PER_SEC = 1.5;
 export const BUILD_COUNTDOWN = 25;
 
+// A level as the siege sees it: { waves, laneCount, hp (level-wide hp multiplier) }.
 // Flattened, time-sorted spawn list for wave n: [{ t, type, lane, hp }].
-export function schedule(n) {
+export function schedule(level, n) {
   const out = [];
-  for (const g of WAVES[n - 1].groups) for (let i = 0; i < g.count; i++)
-    out.push({ t: g.at + i * g.every, type: g.type, lane: g.lane === 'alt' ? i % lanePaths.length : g.lane, hp: hpScale(n) * LEVEL_HP * (g.hp || 1) });
+  for (const g of level.waves[n - 1].groups) for (let i = 0; i < g.count; i++)
+    out.push({ t: g.at + i * g.every, type: g.type, lane: g.lane === 'alt' ? i % level.laneCount : g.lane, hp: hpScale(n) * (level.hp ?? 1) * (g.hp || 1) });
   return out.sort((a, b) => a.t - b.t);
 }
 
 // Composition for the preview: [{ type, count, lanes: Set }] in first-appearance order.
-export function composition(n) {
+export function composition(level, n) {
   const map = new Map();
-  for (const s of schedule(n)) {
+  for (const s of schedule(level, n)) {
     const c = map.get(s.type) || map.set(s.type, { type: s.type, count: 0, lanes: new Set() }).get(s.type);
     c.count++; c.lanes.add(s.lane);
   }
