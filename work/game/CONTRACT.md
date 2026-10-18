@@ -21,7 +21,7 @@ You may add helper files named `work/game/<yourmodule>-*.js`. Never edit another
 
 ## Levels and worlds
 
-`work/level.js` picks the level for this page load (`?level=` or `sessionStorage['cd-level']`, default `castle`); switching reloads the page. `scene.js` is the engine (renderer, post-processing, materials, building helpers, render loop) and builds one world: `work/worlds/castle.js` (Dawnhold, the river keep) `work/worlds/frostmere.js` (Frostmere, the winter pass) or `work/worlds/saltreach.js` (Saltreach, the sunset coast, three lanes). Shared fortress pieces live in `work/worlds/fort-kit.js`. A world returns `{ height, BASE, gateCenter, sun, terrain, water, treeLocations, bridgeDeck, lanePaths, laneNames, padSpots, view, titleView, fortPoints, mist, fx: { chimneys, fires, smoke, ambient }, moving, animate(time) }`. Game modules must read world facts from these exports, never hard-code coordinates.
+`work/level.js` picks the level for this page load (`?level=` or `sessionStorage['cd-level']`, default `castle`); switching reloads the page. `scene.js` is the engine (renderer, post-processing, materials, building helpers, render loop) and builds one world: `work/worlds/castle.js` (Dawnhold, the river keep), `work/worlds/frostmere.js` (Frostmere, the winter pass) or `work/worlds/saltreach.js` (Saltreach, the sunset coast, three lanes). Shared fortress pieces live in `work/worlds/fort-kit.js`. A world returns `{ height, BASE, gateCenter, sun, terrain, water, treeLocations, bridgeDeck, lanePaths, laneNames, padSpots, view, titleView, fortPoints, mist, fx: { chimneys, fires, smoke, ambient }, moving, animate(time) }`. Game modules must read world facts from these exports, never hard-code coordinates.
 
 ## scene.js exports
 

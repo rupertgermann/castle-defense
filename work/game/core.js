@@ -65,5 +65,3 @@ export const lanes = lanePaths.map((points, i) => makeLane(laneNames[i], points)
 
 // Enemies that reach this point have breached the gate.
 export const gatePoint = new THREE.Vector3(gateCenter.x, gateCenter.y, gateCenter.z);
-  return best;
-}
