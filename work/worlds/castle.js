@@ -45,15 +45,11 @@ export function buildCastle(K) {
   const terrain = mesh(terrainGeometry, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, bumpMap: groundBump, bumpScale: .25 }));
   terrain.castShadow = false;
 
+  const BASE = 14;
+  const { curtain, tower, keep, hall, flag, flags, pathRibbon, cottage, skyDome, skyLight, waveFlags, relief, padsAlong } = fortKit(K, BASE, height);
   scene.fog = new THREE.FogExp2('#c8c8b9', .00135);
-  const sky = mesh(new THREE.SphereGeometry(950, 32, 16), new THREE.ShaderMaterial({
-    side: THREE.BackSide, depthWrite: false,
-    uniforms: { sunDirection: { value: new THREE.Vector3(-.65, .26, -.48).normalize() } },
-    vertexShader: 'varying vec3 vDirection; void main(){vDirection=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
-    fragmentShader: `varying vec3 vDirection; uniform vec3 sunDirection;
-      void main(){vec3 d=normalize(vDirection); float h=max(d.y,0.); vec3 col=mix(vec3(.78,.76,.64),vec3(.32,.48,.57),pow(h,.42)); float a=max(dot(d,sunDirection),0.); col+=vec3(.42,.24,.07)*pow(a,9.)+vec3(1.8,1.35,.7)*pow(a,1800.); gl_FragColor=vec4(col,1.);}`
-  }));
-  sky.castShadow = sky.receiveShadow = false;
+  const sky = skyDome(`varying vec3 vDirection; uniform vec3 sunDirection;
+      void main(){vec3 d=normalize(vDirection); float h=max(d.y,0.); vec3 col=mix(vec3(.78,.76,.64),vec3(.32,.48,.57),pow(h,.42)); float a=max(dot(d,sunDirection),0.); col+=vec3(.42,.24,.07)*pow(a,9.)+vec3(1.8,1.35,.7)*pow(a,1800.); gl_FragColor=vec4(col,1.);}`, new THREE.Vector3(-.65, .26, -.48).normalize());
   const hemi = new THREE.HemisphereLight('#c5d7e1', '#53553c', 1.25); scene.add(hemi);
   const sun = new THREE.DirectionalLight('#ffdaa1', 3.6);
   sun.position.set(-105, 55, -78); sun.target.position.set(0, 8, 0);
@@ -63,14 +59,8 @@ export function buildCastle(K) {
   scene.add(sun, sun.target);
   const bounce = new THREE.DirectionalLight('#9cbacb', .35); bounce.position.set(65, 40, 80); scene.add(bounce);
 
-  const envScene = new THREE.Scene();
-  envScene.add(new THREE.Mesh(sky.geometry, sky.material));
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(envScene, .08, .1, 1200).texture;
-  scene.environmentIntensity = .28; pmrem.dispose();
+  skyLight(sky, .28);
 
-  const BASE = 14;
-  const { curtain, tower, keep, hall, flag, flags, pathRibbon, cottage } = fortKit(K, BASE, height);
   const enclosure = [[-26, -21], [-3, -29], [23, -23], [31, -1], [22, 25], [4, 31], [-22, 24], [-32, 3]];
   const courtyard = new THREE.Shape(); enclosure.forEach(([x, z], i) => i ? courtyard.lineTo(x, -z) : courtyard.moveTo(x, -z)); courtyard.closePath();
   const court = mesh(new THREE.ShapeGeometry(courtyard), new THREE.MeshStandardMaterial({ ...stoneMaps, color: '#aaa38c', roughness: 1, bumpScale: .08 }));
@@ -351,14 +341,7 @@ export function buildCastle(K) {
     moving: [water, sky, ...flags.map(f => f.mesh), ...birds.map(b => b.mesh)],
     animate(time) {
       water.material.uniforms.time.value = time * .28;
-      for (const flag of flags) {
-        const p = flag.mesh.geometry.attributes.position;
-        for (let i = 0; i < p.count; i++) {
-          const x = flag.original[i * 3], y = flag.original[i * 3 + 1];
-          p.setZ(i, Math.sin(x * 2.2 - time * 2.4 + y * .4) * x * .105); p.setY(i, y + Math.sin(x * 2 - time * 2) * x * .035);
-        }
-        p.needsUpdate = true; flag.mesh.geometry.computeVertexNormals();
-      }
+      waveFlags(time, [2.2, 2.4, .105, 2, .035]);
       for (let i = 0; i < birds.length; i++) {
         const b = birds[i], a = b.angle + time * .035;
         b.mesh.position.set(Math.cos(a) * b.radius - 12, b.high + Math.sin(time * .5 + i) * .5, Math.sin(a) * b.radius - 10); b.mesh.rotation.y = -a; b.mesh.rotation.z = Math.sin(time + i) * .09;

@@ -86,27 +86,13 @@ export function buildSaltreach(K) {
   const terrain = makeTerrain(900, 420, 0);
   makeTerrain(2600, 180, 14).receiveShadow = false;
 
+  const { curtain, tower, keep, hall, flag, flags, pathRibbon, cottage, skyDome, skyLight, waveFlags, relief, padsAlong } = fortKit(K, BASE, height);
   const cottages = [[-36, 96, 6.5, 9, 3.9, .7], [-48, 112, 6, 8, 3.6, .4], [-14, 120, 7, 10, 4.1, -.4], [30, 96, 6, 8.5, 3.6, -.2], [44, 120, 6.5, 9, 3.8, .3]];
   // ---- build pads: alternate sides along all three lanes, on firm, dry, level ground off the road ----
-  const padSpots = [];
-  for (const [L, every, skip] of [[lanePaths[0], 26, 12], [lanePaths[1], 40, 22], [lanePaths[2], 28, 30]]) {
-    for (let i = skip; i < L.length - 8; i += every) {
-      const p = L[i], q = L[Math.min(L.length - 1, i + 3)], tx = q.x - p.x, tz = q.z - p.z, tl = Math.hypot(tx, tz) || 1;
-      for (const side of (i / every) % 2 < 1 ? [1, -1] : [-1, 1]) {
-        let ok = null;
-        for (const off of [9, 10.5, 12, 14]) {
-          const x = p.x - tz / tl * off * side, z = p.z + tx / tl * off * side;
-          let lo = Infinity, hi = -Infinity;
-          for (let k = 0; k < 9; k++) { const a = k * Math.PI / 4, rr = k ? 4.2 : 0, h = height(x + Math.cos(a) * rr, z + Math.sin(a) * rr); lo = Math.min(lo, h); hi = Math.max(hi, h); }
-          if (hi - lo > 3.2 || lo < SEA + 1.2 || roadD(x, z) < 7.5 || Math.hypot(x, z) < 36 || cottages.some(([cx, cz]) => Math.hypot(cx - x, cz - z) < 11) || padSpots.some(([px, pz]) => Math.hypot(px - x, pz - z) < 13)) continue;
-          ok = [Math.round(x), Math.round(z)]; break;
-        }
-        if (ok) { padSpots.push(ok); break; }
-      }
-    }
-  }
+  const padSpots = padsAlong([[lanePaths[0], 26, 12], [lanePaths[1], 40, 22], [lanePaths[2], 28, 30]], [9, 10.5, 12, 14],
+    (x, z, lo, hi) => hi - lo <= 3.2 && lo >= SEA + 1.2 && roadD(x, z) >= 7.5 && Math.hypot(x, z) >= 36 && !cottages.some(([cx, cz]) => Math.hypot(cx - x, cz - z) < 11));
   // Siege sites by the junction: far enough off the shared gate road that a trebuchet's dead zone doesn't swallow it.
-  const levelAt = (x, z) => { let lo = Infinity, hi = -Infinity; for (let k = 0; k < 9; k++) { const a = k * Math.PI / 4, rr = k ? 4.2 : 0, h = height(x + Math.cos(a) * rr, z + Math.sin(a) * rr); lo = Math.min(lo, h); hi = Math.max(hi, h); } return hi - lo < 3.2 && lo > SEA + 1.2; };
+  const levelAt = (x, z) => { const [lo, hi] = relief(x, z); return hi - lo < 3.2 && lo > SEA + 1.2; };
   const laneD = (x, z) => lanePaths.map(L => { let b = Infinity; for (let i = 0; i < L.length; i += 4) b = Math.min(b, Math.hypot(L[i].x - x, L[i].z - z)); return b; });
   const cands = [];
   for (let x = -34; x <= 44; x += 3) for (let z = 34; z <= 110; z += 3) {
@@ -125,19 +111,12 @@ export function buildSaltreach(K) {
   // ---- sunset: low copper sun over the sea in the north-west, violet sky, warm haze ----
   scene.fog = new THREE.FogExp2('#d9a98c', .00118);
   const sunDir = new THREE.Vector3(-.78, .14, -.62).normalize();
-  const sky = mesh(new THREE.SphereGeometry(950, 32, 16), new THREE.ShaderMaterial({
-    side: THREE.BackSide, depthWrite: false,
-    uniforms: { sunDirection: { value: sunDir } },
-    vertexShader: 'varying vec3 vDirection; void main(){vDirection=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
-    fragmentShader: `varying vec3 vDirection; uniform vec3 sunDirection;
+  const sky = skyDome(`varying vec3 vDirection; uniform vec3 sunDirection;
       void main(){vec3 d=normalize(vDirection); float h=max(d.y,0.); float a=max(dot(d,sunDirection),0.);
         vec3 col=mix(vec3(1.,.68,.48),vec3(.3,.44,.64),pow(h,.42)); col=mix(col,vec3(.98,.5,.42),(1.-h)*.35*(1.-a));
         col+=vec3(.95,.42,.12)*pow(a,5.)*(1.-h*.6)+vec3(1.,.55,.2)*pow(a,60.)*.6+vec3(3.,1.9,.9)*smoothstep(.9994,.9997,a);
         float band=1.-smoothstep(0.,.14,d.y); col=mix(col,vec3(1.,.56,.3),band*.55*(.35+.65*a)); col=mix(col,vec3(.42,.36,.62),smoothstep(.25,.7,d.y)*.5);
-        gl_FragColor=vec4(col,1.);}`,
-  }));
-  sky.castShadow = sky.receiveShadow = false;
-  sky.onBeforeRender = (r, sc, cam) => { sky.position.copy(cam.position); sky.updateMatrixWorld(); };
+        gl_FragColor=vec4(col,1.);}`, sunDir, true);
   scene.add(new THREE.HemisphereLight('#9aa6d6', '#4a3a34', 1.15));
   const sun = new THREE.DirectionalLight('#ffa560', 4.6);
   sun.position.copy(sunDir).multiplyScalar(160); sun.target.position.set(10, 8, 40);
@@ -146,9 +125,7 @@ export function buildSaltreach(K) {
   sun.shadow.bias = -.00018; sun.shadow.normalBias = .065; sun.shadow.radius = 3;
   scene.add(sun, sun.target);
   const bounce = new THREE.DirectionalLight('#8a8fd8', .55); bounce.position.set(70, 40, 90); scene.add(bounce);
-  const envScene = new THREE.Scene(); envScene.add(new THREE.Mesh(sky.geometry, sky.material));
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(envScene, .08, .1, 1200).texture; scene.environmentIntensity = .32; pmrem.dispose();
+  skyLight(sky, .32);
 
   // ---- the sea: reflective water, plus a shallows layer that tints the shelf and draws surf lines along every shore ----
   // Tileable fractal value noise (lattice wraps at the tile edge), turned into normals by finite differences:
@@ -205,7 +182,6 @@ export function buildSaltreach(K) {
   shallows.position.y = SEA + .04; shallows.renderOrder = 2; shallows.castShadow = shallows.receiveShadow = false; scene.add(shallows);
 
   // ---- the fortress: curtain on the headland, round towers to the sea, a gate facing the landward roads ----
-  const { curtain, tower, keep, hall, flag, flags, pathRibbon, cottage } = fortKit(K, BASE, height);
   const court = new THREE.Shape(), enclosure = [[-30, -18], [-10, -32], [16, -29], [31, -8], [24, 22], [-24, 22], [-34, 4]];
   enclosure.forEach(([x, z], i) => i ? court.lineTo(x, -z) : court.moveTo(x, -z)); court.closePath();
   const courtMesh = mesh(new THREE.ShapeGeometry(court), new THREE.MeshStandardMaterial({ ...stoneMaps, color: '#a69a83', roughness: 1, bumpScale: .08 }));
@@ -513,11 +489,7 @@ export function buildSaltreach(K) {
       const flick = .85 + .1 * Math.sin(time * 7.3) + .06 * Math.sin(time * 17.1 + 1) + .05 * Math.sin(time * 2.1);
       beaconGlow.scale.setScalar(15 * flick); beaconLight.intensity = 150 * flick;
       for (const f of beaconCore.children) f.scale.set(1, .75 + .35 * Math.abs(Math.sin(time * 6 + f.userData.k)) + .1 * Math.sin(time * 17 + f.userData.k), 1);
-      for (const f of flags) {
-        const p = f.mesh.geometry.attributes.position;
-        for (let i = 0; i < p.count; i++) { const x = f.original[i * 3], y = f.original[i * 3 + 1]; p.setZ(i, Math.sin(x * 2.4 - time * 3.8 + y * .4) * x * .12); p.setY(i, y + Math.sin(x * 2 - time * 3.2) * x * .04); }
-        p.needsUpdate = true; f.mesh.geometry.computeVertexNormals();
-      }
+      waveFlags(time, [2.4, 3.8, .12, 3.2, .04]);
       for (let i = 0; i < birds.length; i++) {
         const b = birds[i], a = b.angle + time * .045 * (i % 2 ? 1 : -1);
         b.mesh.position.set(Math.cos(a) * b.radius + b.cx, b.high + Math.sin(time * .5 + i) * 1.2, Math.sin(a) * b.radius + b.cz); b.mesh.rotation.y = -a + (i % 2 ? 0 : Math.PI); b.mesh.rotation.z = Math.sin(time * .8 + i) * .2;

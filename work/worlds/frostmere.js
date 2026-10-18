@@ -60,16 +60,11 @@ export function buildFrostmere(K) {
   makeTerrain(2600, 200, 14).receiveShadow = false;
 
   // ---- cold dawn: low warm sun on the peaks, blue shadow, pale mist in the valley ----
+  const { curtain, tower, keep, hall, flag, flags, pathRibbon, cottage, skyDome, skyLight, waveFlags, relief, padsAlong } = fortKit(K, BASE, height);
   scene.fog = new THREE.FogExp2('#cbd4df', .0011);
   const sunDir = new THREE.Vector3(.72, .22, -.66).normalize();
-  const sky = mesh(new THREE.SphereGeometry(950, 32, 16), new THREE.ShaderMaterial({
-    side: THREE.BackSide, depthWrite: false,
-    uniforms: { sunDirection: { value: sunDir } },
-    vertexShader: 'varying vec3 vDirection; void main(){vDirection=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
-    fragmentShader: `varying vec3 vDirection; uniform vec3 sunDirection;
-      void main(){vec3 d=normalize(vDirection); float h=max(d.y,0.); vec3 col=mix(vec3(.9,.8,.76),vec3(.36,.5,.68),pow(h,.5)); float a=max(dot(d,sunDirection),0.); col+=vec3(.55,.28,.12)*pow(a,6.)*(1.-h)+vec3(1.8,1.3,.8)*pow(a,1600.); gl_FragColor=vec4(col,1.);}`,
-  }));
-  sky.castShadow = sky.receiveShadow = false;
+  const sky = skyDome(`varying vec3 vDirection; uniform vec3 sunDirection;
+      void main(){vec3 d=normalize(vDirection); float h=max(d.y,0.); vec3 col=mix(vec3(.9,.8,.76),vec3(.36,.5,.68),pow(h,.5)); float a=max(dot(d,sunDirection),0.); col+=vec3(.55,.28,.12)*pow(a,6.)*(1.-h)+vec3(1.8,1.3,.8)*pow(a,1600.); gl_FragColor=vec4(col,1.);}`, sunDir);
   // The dome travels with the camera, so a far zoom-out at the map's edge never sees past it.
   sky.onBeforeRender = (r, sc, cam) => { sky.position.copy(cam.position); sky.updateMatrixWorld(); };
   scene.add(new THREE.HemisphereLight('#bcd2ec', '#6a7486', 1.05));
@@ -80,12 +75,9 @@ export function buildFrostmere(K) {
   sun.shadow.bias = -.00018; sun.shadow.normalBias = .065; sun.shadow.radius = 3;
   scene.add(sun, sun.target);
   const bounce = new THREE.DirectionalLight('#a9c4e2', .5); bounce.position.set(-60, 40, 90); scene.add(bounce);
-  const envScene = new THREE.Scene(); envScene.add(new THREE.Mesh(sky.geometry, sky.material));
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(envScene, .08, .1, 1200).texture; scene.environmentIntensity = .35; pmrem.dispose();
+  skyLight(sky, .35);
 
   // ---- the fortress: a ring of walls on the plateau, a great keep against the mountain, the gate facing down the valley ----
-  const { curtain, tower, keep, hall, flag, flags, pathRibbon, cottage } = fortKit(K, BASE, height);
   for (const k of ['stone', 'base', 'trim', 'roof', 'timber', 'plaster']) snowify(materials[k]);
   const court = new THREE.Shape(), enclosure = [[-27, -22], [-2, -31], [25, -24], [32, 2], [14, 25], [-14, 25], [-32, 2]];
   enclosure.forEach(([x, z], i) => i ? court.lineTo(x, -z) : court.moveTo(x, -z)); court.closePath();
@@ -268,23 +260,8 @@ export function buildFrostmere(K) {
   }
 
   // ---- build pads: alternate sides along both lanes, on firm level ground off the road ----
-  const padSpots = [];
-  for (const [L, every, skip] of [[road, 34, 30], [ice, 30, 25]]) {
-    for (let i = skip; i < L.length - 8; i += every) {
-      const p = L[i], q = L[Math.min(L.length - 1, i + 3)], tx = q.x - p.x, tz = q.z - p.z, tl = Math.hypot(tx, tz) || 1;
-      for (const side of (i / every) % 2 < 1 ? [1, -1] : [-1, 1]) {
-        let ok = null;
-        for (const off of [9, 10.5, 12]) {
-          const x = p.x - tz / tl * off * side, z = p.z + tx / tl * off * side;
-          let lo = Infinity, hi = -Infinity;
-          for (let k = 0; k < 9; k++) { const a = k * Math.PI / 4, rr = k ? 4.2 : 0, h = height(x + Math.cos(a) * rr, z + Math.sin(a) * rr); lo = Math.min(lo, h); hi = Math.max(hi, h); }
-          if (hi - lo > 3.4 || roadD(x, z) < 7.5 || lakeD(x, z) < 1.12 || Math.hypot(x, z) < 37 || padSpots.some(([px, pz]) => Math.hypot(px - x, pz - z) < 13)) continue;
-          ok = [Math.round(x), Math.round(z)]; break;
-        }
-        if (ok) { padSpots.push(ok); break; }
-      }
-    }
-  }
+  const padSpots = padsAlong([[road, 34, 30], [ice, 30, 25]], [9, 10.5, 12],
+    (x, z, lo, hi) => hi - lo <= 3.4 && roadD(x, z) >= 7.5 && lakeD(x, z) >= 1.12 && Math.hypot(x, z) >= 37);
 
   const fires = [[-6.5, BASE + 12, 28.6, 1], [0, BASE + 10.2, 26, 1], [6.5, BASE + 12, 28.6, 2], [-14, BASE + 9.5, 25, 2], [14, BASE + 9.5, 25, 2], [19, BASE + 12, -4, 2],
     [-32, BASE + 13, 2, 3], [32, BASE + 12.5, 2, 3], [0, BASE + 24, -12, 3], [-18, BASE + 11, -3, 3], [-2, BASE + 16, -31, 3]];
@@ -300,11 +277,7 @@ export function buildFrostmere(K) {
     fx: { chimneys, fires, smoke: [[0, BASE + 24, -12], [0, BASE + 11, 27], [19, BASE + 13, -4], [-18, BASE + 12, -3], [-32, BASE + 13, 2]], ambient: 'snow' },
     moving: [sky, ...flags.map(f => f.mesh), ...birds.map(b => b.mesh)],
     animate(time) {
-      for (const f of flags) {
-        const p = f.mesh.geometry.attributes.position;
-        for (let i = 0; i < p.count; i++) { const x = f.original[i * 3], y = f.original[i * 3 + 1]; p.setZ(i, Math.sin(x * 2.6 - time * 3.4 + y * .4) * x * .12); p.setY(i, y + Math.sin(x * 2 - time * 3) * x * .04); }
-        p.needsUpdate = true; f.mesh.geometry.computeVertexNormals();
-      }
+      waveFlags(time, [2.6, 3.4, .12, 3, .04]);
       for (let i = 0; i < birds.length; i++) {
         const b = birds[i], a = b.angle + time * .03;
         b.mesh.position.set(Math.cos(a) * b.radius + 10, b.high + Math.sin(time * .4 + i) * .6, Math.sin(a) * b.radius + 30); b.mesh.rotation.y = -a; b.mesh.rotation.z = Math.sin(time + i) * .1;

@@ -1,4 +1,5 @@
-// Shared medieval architecture for the worlds: curtain walls, towers, keep, halls, flags, road ribbons, cottages.
+// Shared pieces for the worlds: curtain walls, towers, keep, halls, flags, road ribbons, cottages, plus the sky,
+// its image-based light, flag motion and build-site placement that every level builds the same way.
 // `BASE` is the fortress plateau height; `height(x, z)` is the world's terrain.
 export function fortKit(K, BASE, height) {
   const { THREE, scene, materials, mesh, box, cylinder, beam, worldUV, facade, tiledCone, pitchedRoof } = K;
@@ -142,5 +143,48 @@ export function fortKit(K, BASE, height) {
     box(.85, 3.5, .9, -w * .23, h + 1.65, -d * .2, materials.stone, group);
     box(1.06, .2, 1.11, -w * .23, h + 3.3, -d * .2, materials.trim, group);
   }
-  return { curtain, tower, keep, hall, flag, flags, pathRibbon, cottage };
+  // Sky dome (riding along with the camera when `follow`, so a far zoom-out never sees past it), and the ambient
+  // image-based light baked from it.
+  function skyDome(fragmentShader, sunDirection, follow = false) {
+    const sky = mesh(new THREE.SphereGeometry(950, 32, 16), new THREE.ShaderMaterial({
+      side: THREE.BackSide, depthWrite: false, uniforms: { sunDirection: { value: sunDirection } }, fragmentShader,
+      vertexShader: 'varying vec3 vDirection; void main(){vDirection=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+    }));
+    sky.castShadow = sky.receiveShadow = false;
+    if (follow) sky.onBeforeRender = (r, sc, cam) => { sky.position.copy(cam.position); sky.updateMatrixWorld(); };
+    return sky;
+  }
+  function skyLight(sky, intensity) {
+    const env = new THREE.Scene(); env.add(new THREE.Mesh(sky.geometry, sky.material));
+    const pmrem = new THREE.PMREMGenerator(K.renderer);
+    scene.environment = pmrem.fromScene(env, .08, .1, 1200).texture; scene.environmentIntensity = intensity; pmrem.dispose();
+  }
+  // Flags ripple in the wind: [ripple frequency, ripple speed, ripple depth, lift speed, lift depth].
+  function waveFlags(time, [fx, ft, depth, lt, lift]) {
+    for (const f of flags) {
+      const p = f.mesh.geometry.attributes.position;
+      for (let i = 0; i < p.count; i++) { const x = f.original[i * 3], y = f.original[i * 3 + 1]; p.setZ(i, Math.sin(x * fx - time * ft + y * .4) * x * depth); p.setY(i, y + Math.sin(x * 2 - time * lt) * x * lift); }
+      p.needsUpdate = true; f.mesh.geometry.computeVertexNormals();
+    }
+  }
+  // Ground relief under a tower footprint: [lowest, highest] terrain height within 4.2 m.
+  function relief(x, z) {
+    let lo = Infinity, hi = -Infinity;
+    for (let k = 0; k < 9; k++) { const a = k * Math.PI / 4, rr = k ? 4.2 : 0, h = height(x + Math.cos(a) * rr, z + Math.sin(a) * rr); lo = Math.min(lo, h); hi = Math.max(hi, h); }
+    return [lo, hi];
+  }
+  // Build sites: every `every` samples along each lane, alternating sides, at the first offset from the road whose
+  // ground passes `ok(x, z, lo, hi)` and that keeps 13 m from the other sites.
+  function padsAlong(spec, offsets, ok, out = []) {
+    for (const [L, every, skip] of spec) for (let i = skip; i < L.length - 8; i += every) {
+      const p = L[i], q = L[Math.min(L.length - 1, i + 3)], tx = q.x - p.x, tz = q.z - p.z, tl = Math.hypot(tx, tz) || 1;
+      for (const side of (i / every) % 2 < 1 ? [1, -1] : [-1, 1]) {
+        const at = offsets.map(off => [p.x - tz / tl * off * side, p.z + tx / tl * off * side])
+          .find(([x, z]) => ok(x, z, ...relief(x, z)) && !out.some(([px, pz]) => Math.hypot(px - x, pz - z) < 13));
+        if (at) { out.push(at.map(Math.round)); break; }
+      }
+    }
+    return out;
+  }
+  return { curtain, tower, keep, hall, flag, flags, pathRibbon, cottage, skyDome, skyLight, waveFlags, relief, padsAlong };
 }
