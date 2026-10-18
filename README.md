@@ -140,6 +140,7 @@ Build the requested HTML before running browser tools. GPU launch options use Me
 
 | Command | Purpose and options |
 | --- | --- |
+| `node work/sky-light-test.mjs [name]` | Check all three sky environments for browser errors and PMREM filter warnings. Defaults to `castle-defense`. |
 | `node work/gallery.mjs` | Capture nine images in `docs/screenshots/`: title screens, live combat, and tower management for all three levels. It uses normal game APIs to spend starting gold and keyboard/mouse input to start combat and select towers. It records the HTML SHA-256 and scene state in `manifest.json`, and rejects browser errors or external HTTP requests. |
 | `node work/shot.mjs <name> <out.png> [--size 1600x900] [--eval "<js>"] [--wait 3000]` | Screenshot a built game; `name` excludes `.html`. |
 | `node work/playtest.mjs [name] [speed] [level]` | Play through via input. Defaults to `castle-defense` and speed `3`. Create `work/shots/play/` first. |
