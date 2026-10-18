@@ -29,7 +29,7 @@ const KIND = {
   outrider: { w: .7, l: 1.5, stride: 3.4, lat: 1.0, shadow: [1.0, 2.4], vary: .03 },
 };
 
-let models, material, bars, shadows, nextId = 1;
+let models, material, bars, shadows, pips, nextId = 1;
 const ghosts = []; // dying / leaking enemies still animating
 const PI = Math.PI, TAU = PI * 2;
 const _v = new THREE.Vector3(), _d = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _s = new THREE.Vector3();
@@ -139,6 +139,31 @@ function makeBars() {
   scene.add(pts);
   return pts;
 }
+// Far-view markers: a crimson pip over each foe with a minimum on-screen size, fading out as the camera comes
+// close enough for the model itself to read. Drawn over the scenery so a column in the trees is never lost.
+function makePips() {
+  const cap = 300, geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(cap * 3), 3).setUsage(THREE.DynamicDrawUsage));
+  geo.setAttribute('size', new THREE.BufferAttribute(new Float32Array(cap), 1).setUsage(THREE.DynamicDrawUsage));
+  const mat = new THREE.ShaderMaterial({
+    transparent: true, depthTest: false, depthWrite: false,
+    uniforms: { uScale: { value: 450 }, uPR: { value: 1 } },
+    vertexShader: `attribute float size; uniform float uScale, uPR; varying float vA; varying float vB;
+      void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.); gl_Position = projectionMatrix * mv;
+        float body = abs(size) * projectionMatrix[1][1] * uScale / -mv.z;   // size < 0 marks a boss      // the model's height on screen, in px
+        vA = 1. - smoothstep(16. * uPR, 30. * uPR, body); vB = step(size, 0.);
+        gl_PointSize = mix(7., 10., vB) * uPR; }`,
+    fragmentShader: `varying float vA; varying float vB;
+      void main(){ vec2 p = gl_PointCoord - .5; float d = abs(p.x) + abs(p.y);   // a small diamond
+        if (d > .5 || vA < .01) discard;
+        vec3 c = d > .36 ? vec3(.08, .02, .01) : mix(vec3(.95, .2, .1), vec3(1., .75, .3), vB);
+        gl_FragColor = vec4(c, vA * .95); }`,
+  });
+  const pts = new THREE.Points(geo, mat);
+  pts.frustumCulled = false; pts.renderOrder = 21; pts.cap = cap; pts.n = 0;
+  scene.add(pts);
+  return pts;
+}
 function makeShadows() {
   const cap = 300, geo = new THREE.PlaneGeometry(1, 1).rotateX(-PI / 2);
   const alpha = new THREE.InstancedBufferAttribute(new Float32Array(cap), 1).setUsage(THREE.DynamicDrawUsage);
@@ -161,7 +186,7 @@ export function init() {
   material = makeMaterial();
   models = buildModels();
   for (const m of Object.values(models)) setupModel(m);
-  bars = makeBars();
+  bars = makeBars(); pips = makePips();
   shadows = makeShadows();
 }
 
@@ -414,13 +439,16 @@ const _cr = new THREE.Matrix4(), _cm = new THREE.Matrix4();
 // ---------------------------------------------------------------- per-frame render
 function render() {
   for (const m of Object.values(models)) for (const mesh of m.meshes) mesh.count = 0;
-  bars.n = 0; shadows.count = 0;
+  bars.n = 0; pips.n = 0; shadows.count = 0;
   for (const e of state.enemies) draw(e);
   for (const g of ghosts) draw(g);
   for (const m of Object.values(models)) for (const mesh of m.meshes) {
     mesh.instanceMatrix.needsUpdate = true; mesh.fx.needsUpdate = true; mesh.instanceColor.needsUpdate = true;
   }
   shadows.instanceMatrix.needsUpdate = true; shadows.alpha.needsUpdate = true;
+  const pg = pips.geometry;
+  pg.attributes.position.needsUpdate = true; pg.attributes.size.needsUpdate = true; pg.setDrawRange(0, pips.n);
+  pips.material.uniforms.uPR.value = renderer.getPixelRatio(); pips.material.uniforms.uScale.value = renderer.domElement.height / 2;
   const bg = bars.geometry;
   bg.attributes.position.needsUpdate = true; bg.attributes.bar.needsUpdate = true; bg.setDrawRange(0, bars.n);
   bars.material.uniforms.uPR.value = renderer.getPixelRatio();
@@ -492,6 +520,10 @@ function draw(e) {
     _root.compose(_v.set(e.pos.x, e.pos.y + .04, e.pos.z), _q, _s.set(sx * 1.25, 1, sz * 1.25));
     _root.toArray(shadows.instanceMatrix.array, i * 16);
     shadows.alpha.array[i] = (1 - Math.max(fade, sink)) * (e.typeId === 'ram' ? .95 : 1);
+  }
+  if (e.alive && pips.n < pips.cap) {
+    const i = pips.n++, h = type.height * e.scale * SEP;
+    pips.geometry.attributes.position.array.set([e.pos.x, e.pos.y + h * .55, e.pos.z], i * 3); pips.geometry.attributes.size.array[i] = type.boss ? -h : h;
   }
   // health bar
   if (e.alive && e.barA > 0 && bars.n < bars.cap) {
