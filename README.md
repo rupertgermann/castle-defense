@@ -2,6 +2,14 @@
 
 Castle Defense is a browser tower-defense game built with Three.js. Defend the gate through 15 waves, build and upgrade towers, and choose between three battlefields and three difficulty settings.
 
+**[Play Castle Defense in your browser](https://rupertgermann.github.io/castle-defense/)** — no installation required.
+
+## Publish to GitHub Pages
+
+Every push to `master` runs the build and scheduler checks, builds the game from source, and publishes it to [GitHub Pages](https://rupertgermann.github.io/castle-defense/). A failed check or build prevents deployment, so the previous version stays online.
+
+The [deployment workflow](.github/workflows/pages.yml) publishes only the generated game as `index.html`. To republish manually, run **Deploy game to GitHub Pages** from the repository's **Actions** tab with `master` selected.
+
 ## Gameplay gallery
 
 Each battlefield has a title screen, a live combat view, and a tower-management view. Battles use Squire difficulty with the normal starting gold and tower costs. The game continues running while the tower card is open.
