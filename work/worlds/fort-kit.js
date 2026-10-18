@@ -157,7 +157,8 @@ export function fortKit(K, BASE, height) {
   function skyLight(sky, intensity) {
     const env = new THREE.Scene(); env.add(new THREE.Mesh(sky.geometry, sky.material));
     const pmrem = new THREE.PMREMGenerator(K.renderer);
-    scene.environment = pmrem.fromScene(env, .08, .1, 1200).texture; scene.environmentIntensity = intensity; pmrem.dispose();
+    // Keep sky blur within PMREM's 20-sample budget at its default 256-pixel resolution.
+    scene.environment = pmrem.fromScene(env, .04, .1, 1200).texture; scene.environmentIntensity = intensity; pmrem.dispose();
   }
   // Flags ripple in the wind: [ripple frequency, ripple speed, ripple depth, lift speed, lift depth].
   function waveFlags(time, [fx, ft, depth, lt, lift]) {
