@@ -89,8 +89,10 @@ function selectDiff(k) {
 }
 selectDiff(DIFFS[sessionStorage.getItem('cd-diff')] ? sessionStorage.getItem('cd-diff') : 'knight');
 
+let pendingLevel = LEVEL;
 function startGame(k = diffKey, instant = false) {
   if (state.phase !== 'title') return;
+  if (pendingLevel !== LEVEL) return switchLevel(pendingLevel, k);   // a level chosen with the arrows loads straight into its siege
   selectDiff(k);
   const d = DIFFS[k];
   state.gold = Math.round(BASE_GOLD * d.gold); state.lives = state.maxLives = d.lives; state.wave = 0; state.phase = 'build';
@@ -645,10 +647,10 @@ addEventListener('keydown', e => {
     }
     if (btn?.dataset.a === 'level' && (key === 'arrowleft' || key === 'arrowright')) {   // focus moves; Space switches level
       const bs = [...root.querySelectorAll('.mapbtn')], k = (bs.indexOf(btn) + (key === 'arrowright' ? 1 : bs.length - 1)) % bs.length;
-      e.preventDefault(); for (const b of bs) b.tabIndex = -1; bs[k].tabIndex = 0; bs[k].focus(); return;
+      e.preventDefault(); for (const b of bs) { const on = b === bs[k]; b.tabIndex = on ? 0 : -1; b.classList.toggle('sel', on); b.setAttribute('aria-checked', on); }
+      bs[k].focus(); pendingLevel = bs[k].dataset.k; return;   // like the difficulty cards: arrows choose; the level loads when the siege begins
     }
     if (key === ' ' && btn) return;
-    if (key === 'enter' && btn?.dataset.a === 'level' && btn.dataset.k !== LEVEL) { e.preventDefault(); return switchLevel(btn.dataset.k, diffKey); }   // begin the level you're looking at
     if (key === 'enter' || key === ' ') { e.preventDefault(); if (btn?.dataset.a === 'diff') selectDiff(btn.dataset.k); startGame(); }
     return;
   }
