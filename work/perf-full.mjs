@@ -1,6 +1,6 @@
 // Compare complete animation frames, including game updates, DOM work, and render submission.
 // Usage: node work/perf-full.mjs before.html after.html [rounds=5] [report=/tmp/castle-perf.json]
-import { chromium } from '/Users/rupertgermann/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
+import { chromium } from 'playwright';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 import { writeFile } from 'node:fs/promises';
@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 
 const [before, after = before, rounds = '5', report = '/tmp/castle-perf.json'] = process.argv.slice(2);
 assert(before, 'Supply a built HTML file');
-const browser = await chromium.launch({ headless: true, args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] });
+const browser = await chromium.launch({ headless: true, args: process.platform === 'darwin' ? ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] : [] });
 const results = [];
 try {
   for (let round = 0; round < Number(rounds); round++) {

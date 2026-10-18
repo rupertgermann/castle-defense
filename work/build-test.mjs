@@ -10,6 +10,7 @@ let child;
 try {
   await mkdir(join(root, 'work/game'), { recursive: true });
   await mkdir(join(root, 'outputs'));
+  await copyFile(new URL('../LICENSE', import.meta.url), join(root, 'LICENSE'));
   await copyFile(new URL('./build.mjs', import.meta.url), join(root, 'work/build.mjs'));
   await symlink(new URL('./node_modules', import.meta.url).pathname, join(root, 'work/node_modules'));
   await writeFile(join(root, 'work/game/main.js'), "import { value } from './value.js'; console.log(value);");
@@ -17,7 +18,10 @@ try {
   await writeFile(source, "export const value = 'before-change';");
   const { buildGame } = await import(new URL(`file://${root}/work/build.mjs`));
   await buildGame('custom');
-  assert.match(await readFile(join(root, 'outputs/custom.html'), 'utf8'), /before-change/);
+  const built = await readFile(join(root, 'outputs/custom.html'), 'utf8');
+  assert.match(built, /before-change/);
+  assert(built.includes(await readFile(new URL('../LICENSE', import.meta.url), 'utf8')));
+  assert(built.includes(await readFile(new URL('./node_modules/three/LICENSE', import.meta.url), 'utf8')));
 
   // Use an ephemeral port in the isolated copy so no existing preview is touched.
   const preview = (await readFile(new URL('./preview.mjs', import.meta.url), 'utf8'))

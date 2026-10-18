@@ -1,14 +1,14 @@
 // Screenshot harness for builders and critics. Run from the project root.
 // Usage: node work/shot.mjs <html-name> <out.png> [--size 1600x900] [--eval "<async js run in page>"] [--wait ms]
 // Example: node work/shot.mjs castle-defense work/shots/a.png --eval "__game.ui.debugStart?.()" --wait 4000
-import { chromium } from '/Users/rupertgermann/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
+import { chromium } from 'playwright';
 import { pathToFileURL } from 'node:url';
 import { mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
 const [name, out, ...rest] = process.argv.slice(2);
 const opt = k => { const i = rest.indexOf(k); return i >= 0 ? rest[i + 1] : undefined; };
 const [w, h] = (opt('--size') || '1600x900').split('x').map(Number);
-const browser = await chromium.launch({ headless: true, args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] });
+const browser = await chromium.launch({ headless: true, args: process.platform === 'darwin' ? ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] : [] });
 const page = await browser.newPage({ viewport: { width: w, height: h }, deviceScaleFactor: 1 });
 const errors = [];
 page.on('pageerror', e => errors.push('pageerror: ' + e.message));

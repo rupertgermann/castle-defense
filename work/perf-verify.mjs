@@ -1,6 +1,6 @@
 // Deterministic before/after gameplay and rendered-pixel comparison.
 // Usage: node work/perf-verify.mjs before.html after.html [output=/tmp/castle-perf-verify]
-import { chromium } from '/Users/rupertgermann/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
+import { chromium } from 'playwright';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 
 const [before, after, out = '/tmp/castle-perf-verify'] = process.argv.slice(2);
 await mkdir(out, { recursive: true });
-const browser = await chromium.launch({ headless: true, args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] });
+const browser = await chromium.launch({ headless: true, args: process.platform === 'darwin' ? ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] : [] });
 const results = [];
 try {
   for (const level of ['castle', 'frostmere', 'saltreach']) {
