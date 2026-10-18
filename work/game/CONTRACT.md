@@ -13,7 +13,7 @@ Quality bar: AAA. A harsh visual critic will review screenshots of your work and
 | `work/game/siege.js` | orchestrator | Siege rules: phase, waves, countdown, horn, gold, keep strength, win/lose, crowns. Imports nothing that loads the scene; tested in Node by `work/siege-test.mjs`. |
 | `work/game/main.js` | orchestrator | Calls `init()` on all modules, then each frame spawns what `siege.tick(dt)` returns, then `ui.update(dt, realDt)`, `enemies.update(dt)`, `towers.update(dt)`, `fx.update(dt, realDt)`, `audio.update(dt, realDt)`. `dt` is game time (0 when paused, ×speed). |
 | `work/game/enemies.js` | enemies agent | Enemy types, models, animation, movement, health bars, death. |
-| `work/game/towers.js` | towers agent | View adapter: build pads, models posed from the rules state, projectiles and fire-pool glows, picking and highlights. |
+| `work/game/towers.js` | towers agent | View adapter: build sites, models posed from the rules state, projectiles and fire-pool glows, picking and highlights. |
 | `work/game/towers-rules.js` | towers agent | Tower rules for six tower types: build/upgrade/sell economy, targeting, turning, leading, projectile flight, impacts, fire pools. Imports nothing that loads the scene; tested in Node by `work/towers-test.mjs`. |
 | `work/game/fx.js` | fx agent | Particles, explosions, impacts, floating numbers, screen shake, castle damage visuals. Event-driven only. |
 | `work/game/audio.js` | audio agent | All sound, procedural WebAudio (no files; must work offline). Event-driven only. |
@@ -76,7 +76,7 @@ Must hold 60 fps with 80 live enemies (use instancing / merged geometry; skinned
 ## towers.js
 
 ```js
-export const TOWER_TYPES  // { [id]: { name, description, damageType, levels: [{ cost, damage, range, rate /*shots per s*/, splash?, slow? }, ×3] } }
+export const TOWER_TYPES  // { [id]: { name, description, damageType, projectile, turn /*radians per s*/, levels: [{ cost, damage, range, minRange?, rate /*shots per s*/, splash?, slow?, armorPierce?, burn? }, ×3] } }
 export const pads          // [{ id, pos: Vector3, tower: null|tower }]
 export function buildTower(pad, typeId) → tower|null  // deducts gold, emits 'tower:build' {tower}
 export function upgradeCost(tower) → number|null        // null at max level

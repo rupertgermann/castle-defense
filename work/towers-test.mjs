@@ -1,7 +1,7 @@
 // Tower rules in Node on a straight test road: economy, targeting, impacts, fire pools. Run: node work/towers-test.mjs
 import assert from 'node:assert/strict';
 import { Vector3 } from 'three';
-import { createTowerRules, TOWER_TYPES } from './game/towers-rules.js';
+import { createTowerRules, TOWER_TYPES, upgradeCost, sellValue } from './game/towers-rules.js';
 
 // The road runs along +x from spawn (x = 0) to the gate (x = length); build sites stand 10 m off it.
 function world({ gold = 1e4, length = 100 } = {}) {
@@ -47,16 +47,16 @@ for (const [type, ups, spent, refund] of [
   const g = world(), pad = g.pad(), t = g.rules.build(pad, type);
   for (let i = 0; i < ups; i++) assert.equal(g.rules.upgrade(t), true);
   assert.deepEqual([t.level, t.spent, t.range, g.seen('tower:upgrade').length], [ups, spent, TOWER_TYPES[type].levels[ups].range, ups]);
-  assert.equal(g.rules.sellValue(t), refund);
+  assert.equal(sellValue(t), refund);
   const gold = g.state.gold; g.rules.sell(t);
   assert.deepEqual([g.state.gold, g.state.towers.length, pad.tower, t.sold], [gold + refund, 0, null, true]);
   assert.deepEqual(g.seen('tower:sell'), [{ tower: t, pos: t.pos }]);
 }
 {
   const g = world(), t = g.rules.build(g.pad(), 'ballista');
-  assert.equal(g.rules.upgradeCost(t), 190);
+  assert.equal(upgradeCost(t), 190);
   g.rules.upgrade(t); g.rules.upgrade(t);
-  assert.equal(g.rules.upgradeCost(t), null, 'null at max level');
+  assert.equal(upgradeCost(t), null, 'null at max level');
   assert.equal(g.rules.upgrade(t), false);
 }
 
@@ -94,8 +94,8 @@ const landed = (g, kind) => g.seen('projectile:impact').some(d => d.projectile =
 for (const [type, id] of Object.entries(TOWER_TYPES)) {
   const g = world(); g.rules.build(g.pad(), type); g.foe(55);   // 11.2 m off: outside the Trebuchet's dead zone, inside every range
   g.run(6, () => g.hits.length);
-  const { type: sent, slow, armorPierce } = g.hits[0].opts, L = id.levels[0];
-  assert.deepEqual([sent, slow, armorPierce], [id.damageType, L.slow || null, L.armorPierce || 0], type);
+  const { type: sent, slow, armorPierce } = g.hits[0].opts, stats = id.levels[0];
+  assert.deepEqual([sent, slow, armorPierce], [id.damageType, stats.slow || null, stats.armorPierce || 0], type);
 }
 // kill credit: a sold tower earns none for the shot it left in the air
 for (const sold of [false, true]) {
@@ -128,6 +128,7 @@ for (const sold of [false, true]) {
   g.rules.upgrade(b); g.rules.upgrade(b);
   g.run(4, () => g.rules.pools.length === 2);
   g.rules.sell(a); g.rules.sell(b);
+  assert.deepEqual(g.rules.pools.map(p => [p.dps, Math.hypot(e.pos.x - p.pos.x, e.pos.z - p.pos.z) <= p.radius + e.radius * .5]).sort((x, y) => x[0] - y[0]), [[16, true], [38, true]], 'the foe stands in both pools');
   g.hits.length = 0; g.run(1);
   assert.deepEqual(g.hits.map(h => h.n), [9.5, 9.5, 9.5, 9.5]);
 }

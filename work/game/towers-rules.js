@@ -2,9 +2,10 @@
 // Imports nothing that loads the scene, so it runs in Node (`node work/towers-test.mjs`); towers.js is the view.
 import { Vector3 } from 'three';
 
+// turn: radians per second the weapon swings toward its target.
 export const TOWER_TYPES = {
   archer: {
-    name: 'Archer Tower', damageType: 'pierce', projectile: 'arrow',
+    name: 'Archer Tower', damageType: 'pierce', projectile: 'arrow', turn: 7,
     description: 'Timber-crowned watchtower. Fast, reliable arrows against single targets.',
     levels: [
       { cost: 70, damage: 14, range: 17, rate: 1.2 },
@@ -13,7 +14,7 @@ export const TOWER_TYPES = {
     ],
   },
   cannon: {
-    name: 'Bombard Tower', damageType: 'blast', projectile: 'cannonball',
+    name: 'Bombard Tower', damageType: 'blast', projectile: 'cannonball', turn: 2.2,
     description: 'Stout stone drum with a bronze cannon. Slow, heavy shots that blast groups.',
     levels: [
       { cost: 120, damage: 34, range: 16, rate: .5, splash: 3.2 },
@@ -22,7 +23,7 @@ export const TOWER_TYPES = {
     ],
   },
   mage: {
-    name: 'Arcane Spire', damageType: 'magic', projectile: 'arcane',
+    name: 'Arcane Spire', damageType: 'magic', projectile: 'arcane', turn: 99,
     description: 'A focusing crystal hurls seeking arcane bolts that ignore armour and slow the foe.',
     levels: [
       { cost: 100, damage: 12, range: 16, rate: 1.0, slow: { factor: .6, duration: 1.6 } },
@@ -31,7 +32,7 @@ export const TOWER_TYPES = {
     ],
   },
   ballista: {
-    name: 'Ballista', damageType: 'pierce', projectile: 'bolt',
+    name: 'Ballista', damageType: 'pierce', projectile: 'bolt', turn: 3,
     description: 'Siege bolt thrower. Long range, massive single-target damage that punches through armour.',
     levels: [
       { cost: 150, damage: 80, range: 24, rate: .42, armorPierce: .6 },
@@ -42,7 +43,7 @@ export const TOWER_TYPES = {
   // Area denial: pots shatter into burning pitch that hurts everything walking through it. Fire ignores armour;
   // overlapping pools don't stack (each foe burns from the hottest pool it stands in).
   cauldron: {
-    name: 'Pitch Cauldron', damageType: 'fire', projectile: 'firepot',
+    name: 'Pitch Cauldron', damageType: 'fire', projectile: 'firepot', turn: 2.4,
     description: 'A mangonel lobs pots of burning pitch. They leave pools of fire on the road that scorch every foe that crosses.',
     levels: [
       { cost: 110, damage: 10, range: 15, rate: .38, burn: { dps: 16, radius: 3, duration: 4 } },
@@ -52,7 +53,7 @@ export const TOWER_TYPES = {
   },
   // Long-range siege: the biggest splash in the game, but the arm can't drop a stone at the foot of its own bastion.
   trebuchet: {
-    name: 'Trebuchet', damageType: 'blast', projectile: 'boulder',
+    name: 'Trebuchet', damageType: 'blast', projectile: 'boulder', turn: 1.1,
     description: 'A counterweight engine that hurls boulders across the field, crushing whole ranks. It cannot strike foes close to its own walls.',
     levels: [
       { cost: 170, damage: 70, range: 34, minRange: 11, rate: .25, splash: 4.6 },
@@ -62,19 +63,25 @@ export const TOWER_TYPES = {
   },
 };
 
-// Lobbed shots (bombard, pitch, trebuchet) predict along the road itself, so curves and the gate don't throw them off.
-const ROAD_AIM = { cannonball: true, firepot: true, boulder: true };
-const RELEASE = { boulder: .3 };   // seconds between firing and the projectile leaving (the trebuchet's arm swing)
-const FLIGHT = {
-  arrow: d => .22 + d / 42, cannonball: d => .5 + d / 26, bolt: d => .05 + d / 85, arcane: d => d / 20, firepot: d => .8 + d / 22, boulder: d => 1.5 + d / 24,
+// flight(d): seconds in the air over d metres. gravity: m/s² (the homing arcane bolt has none).
+// roadAim: lobbed shots (bombard, pitch, trebuchet) predict along the road itself, so curves and the gate don't throw them off.
+// release: seconds between firing and the projectile leaving (the trebuchet's arm swing).
+const PROJECTILES = {
+  arrow:      { flight: d => .22 + d / 42, gravity: 22, roadAim: false, release: 0 },
+  cannonball: { flight: d => .5 + d / 26,  gravity: 20, roadAim: true,  release: 0 },
+  bolt:       { flight: d => .05 + d / 85, gravity: 4,  roadAim: false, release: 0 },
+  arcane:     { flight: d => d / 20,       gravity: 0,  roadAim: false, release: 0 },
+  firepot:    { flight: d => .8 + d / 22,  gravity: 22, roadAim: true,  release: 0 },
+  boulder:    { flight: d => 1.5 + d / 24, gravity: 20, roadAim: true,  release: .3 },
 };
-export const GRAV = { arrow: 22, cannonball: 20, bolt: 4, firepot: 22, boulder: 20 };
-const TURN = { archer: 7, cannon: 2.2, ballista: 3, mage: 99, cauldron: 2.4, trebuchet: 1.1 };   // radians per second
 const BURN_TICK = .25;
 
 export const angleDiff = (a, b) => { let d = (b - a) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return d; };
 export const ballisticVelocity = (from, to, T, g, out) => out.subVectors(to, from).divideScalar(T).setY((to.y - from.y + .5 * g * T * T) / T);
-export const aimPoint = (e, out) => out.copy(e.pos).setY(e.pos.y + (e.height || 1.6) * .6);
+export const aimHeight = e => (e.height || 1.6) * .6;   // a foe is aimed at 60% of its height
+export const aimPoint = (e, out) => out.copy(e.pos).setY(e.pos.y + aimHeight(e));
+const flatDist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+export const stat = tower => TOWER_TYPES[tower.typeId].levels[tower.level];
 export const upgradeCost = tower => TOWER_TYPES[tower.typeId].levels[tower.level + 1]?.cost ?? null;
 export const sellValue = tower => Math.floor(tower.spent * .7);
 
@@ -109,24 +116,23 @@ export function createTowerRules({ state, bus, siege, host, lanes, muzzle, groun
   }
 
   // ---- targeting ----
-  const stat = t => TOWER_TYPES[t.typeId].levels[t.level];
   const tmp = new Vector3(), aim = new Vector3(), from = new Vector3();
   const remaining = e => (lanes[e.lane]?.length || 0) - (e.dist || 0);
   function onRoad(e, T, out) {
     const l = lanes[e.lane];
     if (!l) { aimPoint(e, out); return e.velocity ? out.addScaledVector(e.velocity, T) : out; }
     l.pointAt(Math.min(l.length, host.distAfter(e, T)), out);
-    return out.setY(out.y + (e.height || 1.6) * .6);
+    return out.setY(out.y + aimHeight(e));
   }
   function inRange(tower, e) {
-    const d = Math.hypot(e.pos.x - tower.pos.x, e.pos.z - tower.pos.z), s = stat(tower);
+    const d = flatDist(e.pos, tower.pos), s = stat(tower);
     if (!e.alive || d > tower.range || d < (s.minRange || 0)) return false;
     if (!s.minRange) return true;
     // engines with a dead zone only commit to a target whose landing point is still outside it, and short of the gate
-    const kind = TOWER_TYPES[tower.typeId].projectile, T = FLIGHT[kind](d) + (RELEASE[kind] || 0), l = lanes[e.lane];
+    const { flight, release } = PROJECTILES[TOWER_TYPES[tower.typeId].projectile], T = flight(d) + release, l = lanes[e.lane];
     if (l && host.distAfter(e, T) > l.length - 2) return false;
-    onRoad(e, T, tmp); const dl = Math.hypot(tmp.x - tower.pos.x, tmp.z - tower.pos.z);
-    return dl >= s.minRange && dl <= tower.range + 2;
+    const landDist = flatDist(onRoad(e, T, tmp), tower.pos);
+    return landDist >= s.minRange && landDist <= tower.range + 2;
   }
   function acquire(tower) {
     let best = null, bestR = Infinity;
@@ -135,14 +141,26 @@ export function createTowerRules({ state, bus, siege, host, lanes, muzzle, groun
   }
   // Predict where the target's aim point will be when a projectile of flight time f(dist) arrives; returns that time.
   function lead(from, e, kind, out) {
-    const flightTime = FLIGHT[kind], delay = RELEASE[kind] || 0;
+    const { flight, release, roadAim } = PROJECTILES[kind];
     aimPoint(e, out);
-    let T = flightTime(from.distanceTo(out));
+    let T = flight(from.distanceTo(out));
     for (let k = 0; k < 2; k++) {
-      if (ROAD_AIM[kind]) onRoad(e, T + delay, out); else { aimPoint(e, out); if (e.velocity) out.addScaledVector(e.velocity, T); }
-      T = flightTime(from.distanceTo(out));
+      if (roadAim) onRoad(e, T + release, out); else { aimPoint(e, out); if (e.velocity) out.addScaledVector(e.velocity, T); }
+      T = flight(from.distanceTo(out));
     }
     return T;
+  }
+  // Where the next shot leaves (from) and lands (to); returns its flight time. Lobbed shots land on the road, not at chest height.
+  function aimShot(tower, e, from, to) {
+    const kind = TOWER_TYPES[tower.typeId].projectile, T = lead(muzzle(tower, from), e, kind, to);
+    if (PROJECTILES[kind].roadAim) to.y -= aimHeight(e);
+    return T;
+  }
+  // The velocity a ballistic shot at e would leave with now (towers.js lifts the bombard barrel to it).
+  const arcFrom = new Vector3(), arcTo = new Vector3();
+  function arcVelocity(tower, e, out) {
+    const T = aimShot(tower, e, arcFrom, arcTo);
+    return ballisticVelocity(arcFrom, arcTo, T, PROJECTILES[TOWER_TYPES[tower.typeId].projectile].gravity, out);
   }
   function aimTower(tower, dt) {
     if (!tower.target || !inRange(tower, tower.target)) tower.target = acquire(tower);
@@ -151,7 +169,7 @@ export function createTowerRules({ state, bus, siege, host, lanes, muzzle, groun
     let aligned = true;
     if (e) {
       lead(muzzle(tower, from), e, TOWER_TYPES[tower.typeId].projectile, aim);
-      const want = Math.atan2(aim.x - tower.pos.x, aim.z - tower.pos.z), step = TURN[tower.typeId] * dt;
+      const want = Math.atan2(aim.x - tower.pos.x, aim.z - tower.pos.z), step = TOWER_TYPES[tower.typeId].turn * dt;
       tower.yaw += Math.max(-step, Math.min(step, angleDiff(tower.yaw, want)));
       aligned = Math.abs(angleDiff(tower.yaw, want)) < .12;
     }
@@ -162,12 +180,11 @@ export function createTowerRules({ state, bus, siege, host, lanes, muzzle, groun
   // ---- projectiles ----
   const projectiles = [];
   function fire(tower, target) {
-    const type = TOWER_TYPES[tower.typeId], s = stat(tower), kind = type.projectile;
-    const from = muzzle(tower, new Vector3()), to = new Vector3(), T = lead(from, target, kind, to);
-    const p = { kind, type: type.damageType, tower, target, from, to, T, t: 0, pos: from.clone(), prev: from.clone(), vel: new Vector3(), damage: s.damage, splash: s.splash || 0, slow: s.slow || null, armorPierce: s.armorPierce || 0, burn: s.burn || null, wait: RELEASE[kind] || 0 };
-    if (ROAD_AIM[kind]) to.y -= (target.height || 1.6) * .6;
+    const type = TOWER_TYPES[tower.typeId], kind = type.projectile, from = new Vector3(), to = new Vector3(), T = aimShot(tower, target, from, to);
+    // stats: the level's stats when fired (damage, splash?, slow?, armorPierce?, burn?)
+    const p = { kind, damageType: type.damageType, stats: stat(tower), tower, target, from, to, T, t: 0, pos: from.clone(), prev: from.clone(), vel: new Vector3(), wait: PROJECTILES[kind].release };
     if (kind === 'arcane') { p.vel.subVectors(to, from).normalize().multiplyScalar(9).y += 7; p.T = 3.5; p.wob = Math.random() * 6; }
-    else ballisticVelocity(from, to, T, GRAV[kind], p.vel);
+    else ballisticVelocity(from, to, T, PROJECTILES[kind].gravity, p.vel);
     p.v0 = p.vel.clone();
     projectiles.push(p);
     bus.emit('tower:fire', { tower, from: from.clone(), target, projectile: kind });
@@ -188,7 +205,7 @@ export function createTowerRules({ state, bus, siege, host, lanes, muzzle, groun
         p.pos.y += Math.sin(p.t * 14 + p.wob) * dt * 1.2;
         if (d < .5 + (alive ? p.target.radius || .5 : 0) * .6 || p.t > p.T || (!alive && d < .6)) done = true;
       } else {
-        const g = GRAV[p.kind], t = Math.min(p.t, p.T);
+        const g = PROJECTILES[p.kind].gravity, t = Math.min(p.t, p.T);
         p.pos.copy(p.from).addScaledVector(p.v0, t); p.pos.y -= .5 * g * t * t;
         // arrows and bolts steer onto the live target so leading errors never read as misses
         if ((p.kind === 'arrow' || p.kind === 'bolt') && p.target && p.target.alive) { aimPoint(p.target, tmp); tmp.sub(p.to); p.pos.addScaledVector(tmp, (t / p.T) ** 2); }
@@ -203,24 +220,25 @@ export function createTowerRules({ state, bus, siege, host, lanes, muzzle, groun
   // A fire pool reaches a foe whose centre is within radius + half its own radius, for the first splash and every tick alike.
   const pools = [];
   let burnClock = 0;
-  const inPool = (e, pos, r) => Math.hypot(e.pos.x - pos.x, e.pos.z - pos.z) <= r + (e.radius || .5) * .5;
+  const inPool = (e, pos, r) => flatDist(e.pos, pos) <= r + (e.radius || .5) * .5;
   function impact(p) {
-    const tower = p.tower, pos = p.pos.clone(), opts = { type: p.type, armorPierce: p.armorPierce, slow: p.slow };
+    const tower = p.tower, pos = p.pos.clone(), { damage, splash, slow = null, armorPierce = 0, burn } = p.stats;
+    const opts = { type: p.damageType, armorPierce, slow };
     const hit = (e, n) => { if (host.damage(e, n, opts) && !tower.sold) tower.kills++; };
     let radius = .6;
-    if (p.burn) {
-      const b = p.burn; radius = b.radius;
+    if (burn) {
+      radius = burn.radius;
       pos.y = groundY(pos.x, pos.z);
-      for (const e of host.foes().filter(e => inPool(e, pos, b.radius))) hit(e, p.damage);
-      pools.push({ pos, radius: b.radius, dps: b.dps, t: 0, dur: b.duration, tower });
-      bus.emit('projectile:impact', { pos, projectile: p.kind, radius, target: p.target, duration: b.duration });
+      for (const e of host.foes().filter(e => inPool(e, pos, burn.radius))) hit(e, damage);
+      pools.push({ pos, radius: burn.radius, dps: burn.dps, t: 0, dur: burn.duration, tower });
+      bus.emit('projectile:impact', { pos, projectile: p.kind, radius, target: p.target, duration: burn.duration });
       return;
     }
-    if (p.splash) {   // full damage at the centre, half at the edge
-      radius = p.splash;
+    if (splash) {   // full damage at the centre, half at the edge
+      radius = splash;
       pos.y = Math.max(pos.y, groundY(pos.x, pos.z));
-      for (const e of host.inRadius(pos, p.splash)) hit(e, p.damage * (1 - .5 * Math.min(1, Math.hypot(e.pos.x - pos.x, e.pos.z - pos.z) / p.splash)));
-    } else if (p.target && p.target.alive) hit(p.target, p.damage);
+      for (const e of host.inRadius(pos, splash)) hit(e, damage * (1 - .5 * Math.min(1, flatDist(e.pos, pos) / splash)));
+    } else if (p.target && p.target.alive) hit(p.target, damage);
     else if (p.kind !== 'arcane') pos.y = Math.max(groundY(pos.x, pos.z), pos.y);
     bus.emit('projectile:impact', { pos, projectile: p.kind, radius, target: p.target });
   }
@@ -231,13 +249,13 @@ export function createTowerRules({ state, bus, siege, host, lanes, muzzle, groun
     burnClock -= BURN_TICK;
     for (const e of host.foes().slice()) {
       let best = null;
-      for (const b of pools) if ((!best || b.dps > best.dps) && inPool(e, b.pos, b.radius)) best = b;
+      for (const pool of pools) if ((!best || pool.dps > best.dps) && inPool(e, pool.pos, pool.radius)) best = pool;
       if (best && host.damage(e, best.dps * BURN_TICK, { type: 'fire' }) && !best.tower.sold) best.tower.kills++;
     }
   }
 
   return {
-    build, upgrade, sell, upgradeCost, sellValue, lead, projectiles, pools,
+    build, upgrade, sell, lead, arcVelocity, projectiles, pools,
     // busy(tower): true while the view still raises or rebuilds it (no aiming, no cooldown).
     update(dt, busy = () => false) {
       for (const t of state.towers) if (!busy(t)) aimTower(t, dt);

@@ -4,7 +4,7 @@ import { THREE, scene, camera, renderer, composer, height, clearTrees, bridgeDec
 import { state, bus, lanes, siege } from './core.js';
 import { damageEnemy, enemiesInRadius, distAfter } from './enemies.js';
 import { instantiate, ghost, scaffold, padGeometry, runeTexture, projectileGeometries, poseArcher, poseBallista, glowTexture, renderArchers, liveArchers, MANGONEL, TREBUCHET } from './towers-models.js';
-import { createTowerRules, TOWER_TYPES, upgradeCost, sellValue, GRAV, angleDiff, ballisticVelocity } from './towers-rules.js';
+import { createTowerRules, TOWER_TYPES, upgradeCost, sellValue, stat, angleDiff } from './towers-rules.js';
 export { TOWER_TYPES, upgradeCost, sellValue };
 
 const PAD_SPOTS = padSpots;
@@ -25,11 +25,11 @@ let padRoot, hitMeshes = [], projectiles, rangeRing, ghostCache = {}, currentGho
 const tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3();
 
 // View state per tower (model, build animation, shooter, recoil, flare, pitch, clock) and per projectile (trail, spin).
-const view = new WeakMap(), V = t => view.get(t);
+const view = new WeakMap(), viewOf = t => view.get(t);
 const rules = createTowerRules({ state, bus, siege, lanes, groundY, muzzle: muzzleWorld,
   host: { foes: () => state.enemies, damage: damageEnemy, inRadius: enemiesInRadius, distAfter } });
 bus.on('tower:fire', ({ tower, projectile: kind }) => {
-  const _ = V(tower); if (!_) return;   // fx's demo fires from towers that aren't built
+  const _ = viewOf(tower); if (!_) return;   // fx's demo fires from towers that aren't built
   if (_.model.archers) _.shooter++;
   if (kind === 'cannonball') _.recoil = 1;
   if (kind === 'firepot' || kind === 'boulder') _.fired = true;
@@ -73,19 +73,18 @@ function excludeOverlaysFromAO() {
 }
 
 // ---------------- API ----------------
-const stat = t => TOWER_TYPES[t.typeId].levels[t.level];
 const siteHeight = (pad, h) => { pad._.hit.scale.y = h; pad._.hit.updateMatrixWorld(); };
 export function buildTower(pad, typeId, { instant = false, free = false } = {}) {
   const tower = rules.build(pad, typeId, { free });
   if (!tower) return null;
   view.set(tower, { pitch: .3, shooter: 0, recoil: 0, flare: 0, anim: null, model: null, t: Math.random() * 10 });
-  setModel(tower); siteHeight(pad, V(tower).model.height);
+  setModel(tower); siteHeight(pad, viewOf(tower).model.height);
   if (instant) finishAnim(tower); else startAnim(tower, 'build', 1.9);
   return tower;
 }
 export function upgradeTower(tower, { instant = false, free = false } = {}) {
   if (!rules.upgrade(tower, { free })) return false;
-  const _ = V(tower);
+  const _ = viewOf(tower);
   if (_.anim) finishAnim(tower);
   const old = _.model;
   setModel(tower); siteHeight(tower.pad, _.model.height);
@@ -95,7 +94,7 @@ export function upgradeTower(tower, { instant = false, free = false } = {}) {
 export function sellTower(tower) {
   if (tower.sold) return;
   rules.sell(tower); siteHeight(tower.pad, 1.4);
-  if (V(tower).anim) finishAnim(tower);
+  if (viewOf(tower).anim) finishAnim(tower);
   startAnim(tower, 'sell', 1.2);
   sinking.push(tower);
 }
@@ -127,17 +126,17 @@ export function setHighlight(selection, previewTypeId) {
 function setModel(tower) {
   const m = instantiate(tower.typeId, tower.level);
   m.root.position.copy(tower.pos); m.root.rotation.y = tower.pad.yaw;
-  scene.add(m.root); V(tower).model = m;
+  scene.add(m.root); viewOf(tower).model = m;
 }
 function disposeModel(m) { m.root.removeFromParent(); if (m.archers) for (const f of m.archers) liveArchers.delete(f); }
 function startAnim(tower, kind, dur, old = null) {
-  const m = V(tower).model, sc = scaffold(m.hw, m.height * .8);
+  const m = viewOf(tower).model, sc = scaffold(m.hw, m.height * .8);
   sc.position.copy(tower.pos); sc.rotation.y = tower.pad.yaw; sc.scale.y = .001;
   if (kind !== 'sell') scene.add(sc);
-  V(tower).anim = { kind, t: 0, dur, old, sc };
+  viewOf(tower).anim = { kind, t: 0, dur, old, sc };
 }
 function finishAnim(tower) {
-  const _ = V(tower), a = _.anim;
+  const _ = viewOf(tower), a = _.anim;
   if (a) { a.sc.removeFromParent(); if (a.old) disposeModel(a.old); }
   _.anim = null;
   const r = _.model.root; r.position.copy(tower.pos); r.rotation.set(0, tower.pad.yaw, 0); r.scale.set(1, 1, 1);
@@ -146,7 +145,7 @@ function finishAnim(tower) {
 }
 const ease = t => 1 - Math.pow(1 - t, 3);
 function animate(tower, dt) {
-  const a = V(tower).anim, m = V(tower).model, root = m.root;
+  const a = viewOf(tower).anim, m = viewOf(tower).model, root = m.root;
   a.t += dt; const u = Math.min(1, a.t / a.dur);
   if (a.kind === 'build' || a.kind === 'upgrade') {
     // scaffold pops up, tower rises through its foundation inside it, scaffold drops away
@@ -216,17 +215,16 @@ function showRange(center, range, color, minRange = 0) {
 }
 
 // ---------------- posing from the rules state ----------------
-const aimTmp = new THREE.Vector3(), fromTmp = new THREE.Vector3();
 function pose(tower, dt) {
-  const _ = V(tower), e = !_.anim && tower.target;
+  const _ = viewOf(tower), e = !_.anim && tower.target;
   if (e && tower.typeId === 'cannon') {   // the barrel lifts to the arc the next ball will fly
-    const T = rules.lead(muzzleWorld(tower, fromTmp), e, 'cannonball', aimTmp), v = ballisticVelocity(fromTmp, aimTmp.setY(aimTmp.y - (e.height || 1.6) * .6), T, GRAV.cannonball, tmp2);
+    const v = rules.arcVelocity(tower, e, tmp2);
     _.pitch += (Math.atan2(v.y, Math.hypot(v.x, v.z)) - _.pitch) * Math.min(1, dt * 6);
   }
   idle(tower, dt, !!e);
 }
 function muzzleWorld(tower, out) {
-  const _ = V(tower), m = _.model;
+  const _ = viewOf(tower), m = _.model;
   if (m.archers) { const f = m.archers[_.shooter % m.archers.length]; return f.root.localToWorld(out.set(0, 1.46, .6)); }
   if (m.muzzle) { m.root.updateMatrixWorld(); return m.muzzle.getWorldPosition(out); }
   return out.copy(tower.pos).setY(tower.pos.y + m.height);
@@ -234,9 +232,10 @@ function muzzleWorld(tower, out) {
 
 // Per-frame pose of the weapons (turret yaw, bow draw, recoil, crystal pulse, ballista span).
 function idle(tower, dt, engaged) {
-  const _ = V(tower), m = _.model, s = stat(tower), local = tower.yaw - tower.pad.yaw;
+  const _ = viewOf(tower), m = _.model, local = tower.yaw - tower.pad.yaw;
+  const period = 1 / stat(tower).rate, since = period - Math.max(0, tower.cooldown);   // seconds since the last shot
   if (m.archers) {
-    const n = m.archers.length, period = 1 / s.rate;
+    const n = m.archers.length;
     m.archers.forEach((f, i) => {
       const k = (i - _.shooter % n + n) % n, until = tower.cooldown + k * period;
       const draw = engaged ? Math.max(0, Math.min(1, 1 - (until - .05) / Math.min(.75, n * period * .8))) : Math.max(0, (f.draw || 0) - dt * 3);
@@ -258,19 +257,18 @@ function idle(tower, dt, engaged) {
     m.barrel.position.z = -.45 * Math.sin(Math.min(1, _.recoil) * Math.PI * .5) ** 2 * (_.recoil > .75 ? (1 - _.recoil) * 4 : 1);
   }
   if (tower.typeId === 'ballista') {
-    const period = 1 / s.rate, sinceFire = period - Math.max(0, tower.cooldown);
-    const draw = tower.cooldown <= 0 ? 1 : sinceFire < .12 ? 1 - sinceFire / .12 : Math.min(1, (sinceFire - .35) / Math.max(.3, period - .6));
-    poseBallista(m.turret, Math.max(0, draw), tower.cooldown <= 0 || sinceFire > period * .6);
+    const draw = tower.cooldown <= 0 ? 1 : since < .12 ? 1 - since / .12 : Math.min(1, (since - .35) / Math.max(.3, period - .6));
+    poseBallista(m.turret, Math.max(0, draw), tower.cooldown <= 0 || since > period * .6);
   }
   if (m.arm) {
     // snap forward against the stop beam, hang there a moment, then winch slowly back down; reload the cup near the end
-    const period = 1 / s.rate, since = period - Math.max(0, tower.cooldown), { rest, thrown } = MANGONEL;
+    const { rest, thrown } = MANGONEL;
     const k = tower.cooldown <= 0 || !_.fired ? 0 : since < .14 ? 1 - (1 - since / .14) ** 2 : since < .45 ? 1 : Math.max(0, 1 - (since - .45) / Math.max(.3, period - .9));
     m.arm.rotation.x = rest + (thrown - rest) * k + (since < .45 && _.fired ? Math.sin(since * 40) * .04 * (1 - since / .45) : 0);
     m.pot.visible = !_.fired || k < .05;
   }
   if (m.tarm) {
-    const period = 1 / s.rate, since = period - Math.max(0, tower.cooldown), { rest, thrown } = TREBUCHET;
+    const { rest, thrown } = TREBUCHET;
     const k = tower.cooldown <= 0 || !_.fired ? 0 : since < .5 ? 1 - (1 - since / .5) ** 3 : since < 1.1 ? 1 : Math.max(0, 1 - (since - 1.1) / Math.max(.6, period - 1.6));
     const sway = since > .5 && since < 1.6 && _.fired ? Math.sin((since - .5) * 9) * .06 * (1 - (since - .5) / 1.1) : 0;
     m.tarm.rotation.x = rest + (thrown - rest) * k + sway;
@@ -313,9 +311,9 @@ function makeProjectiles() {
 }
 const drawn = new WeakMap(), _zAxis = new THREE.Vector3(0, 0, 1);
 function drawProjectiles() {
-  const { pools, dummy, color } = projectiles, L = rules.projectiles;
+  const { pools, dummy, color } = projectiles;
   const counts = { arrow: 0, bolt: 0, cannonball: 0, arcane: 0, firepot: 0, boulder: 0 };
-  for (const p of L) {
+  for (const p of rules.projectiles) {
     if (p.wait > 0) continue;
     const pool = pools[p.kind];
     let d = drawn.get(p);
@@ -381,22 +379,22 @@ function poolMesh(pos, r) {
   return m;
 }
 function drawPools() {
-  for (const b of rules.pools) if (!glows.has(b)) glows.set(b, poolMesh(b.pos, b.radius));
-  for (const [b, m] of glows) {
-    if (!rules.pools.includes(b)) { m.removeFromParent(); m.geometry.dispose(); m.material.dispose(); glows.delete(b); continue; }
-    m.material.uniforms.life.value = b.t / b.dur; m.material.uniforms.time.value = glowTime;
+  for (const pool of rules.pools) if (!glows.has(pool)) glows.set(pool, poolMesh(pool.pos, pool.radius));
+  for (const [pool, m] of glows) {
+    if (!rules.pools.includes(pool)) { m.removeFromParent(); m.geometry.dispose(); m.material.dispose(); glows.delete(pool); continue; }
+    m.material.uniforms.life.value = pool.t / pool.dur; m.material.uniforms.time.value = glowTime;
   }
 }
 
 // ---------------- frame ----------------
 let glowTime = 0;
-const busy = t => !!V(t).anim;
+const busy = t => !!viewOf(t).anim;
 export function update(dt) {
   glowTime += dt || 0;
-  for (const t of state.towers) { const _ = V(t); _.t += dt; if (_.anim) animate(t, dt); }
+  for (const t of state.towers) { const _ = viewOf(t); _.t += dt; if (_.anim) animate(t, dt); }
   rules.update(dt, busy);
   for (const t of state.towers) pose(t, dt);
-  for (let i = sinking.length - 1; i >= 0; i--) { const t = sinking[i]; if (V(t).anim) animate(t, dt); else sinking.splice(i, 1); }
+  for (let i = sinking.length - 1; i >= 0; i--) { const t = sinking[i]; if (viewOf(t).anim) animate(t, dt); else sinking.splice(i, 1); }
   drawProjectiles();
   drawPools();
   renderArchers(scene);
