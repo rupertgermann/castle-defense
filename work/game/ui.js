@@ -325,7 +325,7 @@ function renderTower() {
   $.cards.innerHTML = `<div class="card parch tower" ${still(t.id)}>${cardHead(t.typeId, def, pips)}<div class="card-b">
     <div class="stats">${statRows(L, N)}</div><div class="rule"></div>
     <div class="kills">${icon('skull')}<span>Foes slain</span><b>${t.kills || 0}</b></div>
-    <div class="acts">${cost == null ? `<button class="btn" disabled>${icon('crown')} Mastered</button>` :
+    <div class="acts ${cost == null ? 'solo' : ''}">${cost == null ? '' :
       `<button class="btn" data-a="upgrade" ${state.gold < cost ? 'disabled' : ''}>${icon('up')} Upgrade <span class="c">${icon('coin')}${cost}</span></button>`}
       <button class="btn sell ${sellArmed === t ? 'armed' : ''}" data-a="sell">${sellArmed === t ? 'Confirm' : 'Sell'} <span class="c">${icon('coin')}+${sell}</span></button></div>
     ${cost != null && state.gold < cost ? `<div class="need">${cost - state.gold} more gold to upgrade</div>` : ''}</div></div>`;
@@ -427,7 +427,7 @@ function refreshHud(realDt) {
   const key = `${state.phase}|${n}`;
   if (key !== hudKey) {
     hudKey = key;
-    set($.pvk, w ? (fighting ? `Wave ${n} · Battle` : `Next · Wave ${n}`) : 'All waves repelled');
+    set($.pvk, w ? (fighting ? 'Battle' : 'Next') : 'All waves repelled');
     set($.pvname, w ? w.name : 'The keep stands'); $.pvname.classList.toggle('boss', !!w?.boss);
     $.pvlist.innerHTML = w ? composition(n).map(c => `<span class="en ${isBoss(c.type) ? 'boss' : ''}" title="${c.count} ${enemyName(c.type)} — ${[...c.lanes].map(l => laneNames[l]).join(' & ')}">${icon(c.type)}<b>${c.count}</b></span>`).join('') : '';
     if (!fighting) setPins(lanes.map((_, i) => w ? schedule(n).filter(e => e.lane === i).length : 0));
