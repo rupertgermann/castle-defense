@@ -95,7 +95,7 @@ function startGame(k = diffKey, instant = false) {
   const d = DIFFS[k];
   state.gold = Math.round(BASE_GOLD * d.gold); state.lives = state.maxLives = d.lives; state.wave = 0; state.phase = 'build';
   countdown = null; dispGold = state.gold; lastGold = state.gold; lastLives = state.lives;
-  $.title.classList.add('out'); document.activeElement?.blur();
+  $.title.classList.add('out'); document.activeElement?.blur(); renderer.domElement.tabIndex = 0;
   setTimeout(() => $.title.classList.remove('on', 'out'), instant ? 0 : 800);
   root.classList.remove('intro');
   controls.autoRotate = false;
@@ -224,6 +224,7 @@ function setupCamera() {
   const v = getView('title'); controls.target.copy(v.target); camera.position.copy(v.pos); controls.update();
   titleOffset(); addEventListener('resize', () => { if (state.phase === 'title') titleOffset(); });
   const el = renderer.domElement;
+  el.tabIndex = -1;   // nothing to do on the map until the siege begins; startGame puts it back in the tab order
   el.setAttribute('role', 'application');
   el.setAttribute('aria-label', `${levelInfo.name}, a castle tower-defense game. Click stone build sites to raise towers and click towers to upgrade or sell them. Drag to rotate, right-drag or two fingers to pan, scroll or pinch to zoom, double-click to reframe. Tab steps through build sites and arrow keys move between them; number keys build, U upgrades, S sells. Space sounds the next wave, P pauses, F changes speed.`);
   // Replace the scene's double-click reset with the game overview (capture phase runs before the canvas listener).
