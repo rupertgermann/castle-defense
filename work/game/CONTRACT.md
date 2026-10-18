@@ -86,7 +86,7 @@ Each module exports `debug` with helpers, reachable as `__game.<module>.debug` i
 - enemies: `debug.spawnMany(typeId, lane, count)`
 - towers: `debug.buildAll()` (a mix of tower types/levels on most pads)
 - fx: `debug.demo()` (fires a representative burst of every effect around the visible area)
-- ui: `debug.start()` (skip title → build phase), `debug.skipToWave(n)`, `debug.give(gold)`, `debug.view(name)` (named camera presets: 'overview', 'gate', 'bridge', 'south')
+- ui: `debug.start()` (skip title → build phase), `debug.skipToWave(n)`, `debug.give(gold)`
 
 ## Build and look
 

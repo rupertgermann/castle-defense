@@ -1,6 +1,6 @@
 // Enemies: the invading host. Types, procedural rigged models (instanced per bone), movement along lanes,
 // crowd spreading, hit/slow/death reactions, billboard health bars and blob contact shadows.
-import { THREE, scene, camera, controls, renderer, height, bridgeDeck, world as level } from '../scene.js';
+import { THREE, scene, camera, renderer, height, bridgeDeck, world as level } from '../scene.js';
 import { state, bus, lanes } from './core.js';
 import { buildModels } from './enemies-models.js';
 
@@ -559,35 +559,6 @@ export const debug = {
     const order = ['hound', 'hound', 'hound', 'raider', 'raider', 'raider', 'raider', 'manatarms', 'manatarms', 'manatarms', 'brute', 'raider', 'raider', 'ram', 'manatarms', 'shaman', 'outrider', 'outrider', 'manatarms', 'warlord', 'brute', 'shaman', 'raider', 'raider'];
     let d = dist;
     for (const id of order) { const [e] = debug.spawnMany(id, lane, 1, d); d += ENEMY_TYPES[id].radius * 2.2 + .6; }
-  },
-  // One of each type side by side across the road at lane distance d (use with hold for a gallery).
-  lineup(lane = 0, d = 60) {
-    const ids = ['hound', 'raider', 'manatarms', 'brute', 'warlord', 'ram'], ds = [0, 2.2, 4.4, 7.2, 11, 17];
-    return ids.map((id, i) => { const [e] = debug.spawnMany(id, lane, 1, d + ds[i]); e.lat = e.latHome = 0; place(e, 0); return e; });
-  },
-  simulate(seconds, step = 1 / 60) { for (let t = 0; t < seconds; t += step) { state.time += step; update(step); } },
-  damageAll(frac = .5, type = 'magic') { for (const e of state.enemies.slice()) damageEnemy(e, e.maxHp * frac * (.5 + Math.random()), { type }); },
-  killSome(n = 5) { for (const e of state.enemies.slice(0, n)) damageEnemy(e, 1e9, { type: 'magic' }); },
-  slowAll(factor = .5, duration = 8) { for (const e of state.enemies) damageEnemy(e, 0.01, { type: 'magic', slow: { factor, duration } }); },
-  clear() { state.enemies.length = 0; ghosts.length = 0; },
-  // Point the camera at lane distance d from a given range (metres), height and side.
-  look(lane = 0, d = 60, range = 9, up = 3.5, side = 1, ahead = .5) {
-    const L = lanes[lane], p = L.pointAt(d), dir = L.directionAt(d);
-    controls.minDistance = .5; controls.enableDamping = false;
-    controls.target.set(p.x, p.y + 1.1, p.z);
-    camera.position.set(p.x - dir.z * range * side + dir.x * range * ahead, p.y + up, p.z + dir.x * range * side + dir.z * range * ahead);
-    controls.update();
-  },
-  // Close-up of one unit on the stone bridge. angle: 0 = from the front, PI/2 = from its left side.
-  portrait(typeId, range = 4, up = 1.5, angle = .6, aimY = null, d = 78) {
-    debug.hold = true;
-    const [e] = debug.spawnMany(typeId, 1, 1, d); e.lat = e.latHome = 0; place(e, 0); debug.simulate(.4);
-    const L = lanes[1], dir = L.directionAt(e.dist), a = Math.atan2(dir.x, dir.z) + angle;
-    controls.minDistance = .5; controls.enableDamping = false;
-    controls.target.set(e.pos.x, e.pos.y + (aimY ?? ENEMY_TYPES[typeId].height * .5), e.pos.z);
-    camera.position.set(e.pos.x + Math.sin(a) * range, controls.target.y + up, e.pos.z + Math.cos(a) * range);
-    controls.update();
-    return e;
   },
   stats() { return { live: state.enemies.length, ghosts: ghosts.length, calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, modelTris: Object.fromEntries(Object.entries(models).map(([k, m]) => [k, m.triangles])) }; },
 };

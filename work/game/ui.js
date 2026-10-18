@@ -1,7 +1,7 @@
 // HUD, title/end screens, input + selection, build/upgrade menus, wave flow, camera framing.
 import { THREE, scene, camera, controls, renderer, titleView, fortPoints, laneNames } from '../scene.js';
 import { LEVEL, LEVELS, levelInfo, switchLevel } from '../level.js';
-import { state, bus, lanes, gatePoint } from './core.js';
+import { state, bus, lanes } from './core.js';
 import * as towers from './towers.js';
 import * as enemies from './enemies.js';
 import * as audio from './audio.js';
@@ -51,7 +51,7 @@ root.innerHTML = `<style>${CSS}</style>${SPRITE}
 <div class="hint parch" data-r="hint" aria-live="polite"></div>
 <div class="banner" data-r="banner" aria-live="polite"></div>
 <div class="breach" data-r="breach"></div>
-<div data-r="pins">${lanes.map((_, i) => `<div class="pin" hidden><b></b><span>${laneNames[i]}</span></div>`).join('')}</div>
+<div class="pins" data-r="pins">${lanes.map((_, i) => `<div class="pin" hidden><b></b><span>${laneNames[i]}</span></div>`).join('')}</div>
 <div class="bm" data-r="bm"></div>
 <div data-r="cards"></div>
 <div class="paused leather" role="dialog" aria-label="Paused">Paused
@@ -150,7 +150,6 @@ const BOUNDS = (() => { const b = { x0: Infinity, x1: -Infinity, z0: Infinity, z
   for (const lane of lanes) for (let d = 0; d <= lane.length; d += 5) { lane.pointAt(d, v); add(v.x, v.z); }
   for (const [x, , z] of fortPoints) add(x, z);
   return b; })();
-const views = {};
 // Portrait screens try a few azimuths and keep the tightest fit; landscape keeps the classic south view.
 function fitOverview() {
   const fits = (innerWidth < innerHeight ? [0, .2, .4, .6, .8] : [.16]).map(fitAt).sort((a, b) => a.dist - b.dist);
@@ -187,13 +186,10 @@ function fitAt(az) {
   }
   return { target, pos: target.clone().addScaledVector(dir, dist), dist };
 }
-const presetView = (tx, ty, tz, ox, oy, oz) => ({ target: new THREE.Vector3(tx, ty, tz), pos: new THREE.Vector3(tx + ox, ty + oy, tz + oz) });
 function getView(name) {
-  if (name === 'overview') return views.overview = fitOverview();
-  return {
-    gate: presetView(gatePoint.x, gatePoint.y - 4, gatePoint.z + 8, 26, 44, 62),
-    title: presetView(...titleView),
-  }[name];
+  if (name === 'overview') return fitOverview();
+  const [tx, ty, tz, ox, oy, oz] = titleView;
+  return { target: new THREE.Vector3(tx, ty, tz), pos: new THREE.Vector3(tx + ox, ty + oy, tz + oz) };
 }
 let tween = null;
 function flyTo(name, instant = false) {
@@ -247,8 +243,9 @@ const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
 function pickAt(x, y) {
   ndc.set(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1); ray.setFromCamera(ndc, camera);
   const hit = towers.pick(ray);
-  return hit?.kind === 'pad' && hit.pad.tower ? { kind: 'tower', tower: hit.pad.tower } : hit;
+  return hit?.kind === 'pad' ? siteSel(hit.pad) : hit;
 }
+const siteSel = p => p.tower ? { kind: 'tower', tower: p.tower } : { kind: 'pad', pad: p };
 const selObj = s => s && (s.tower || s.pad);
 let hlKey = [null, null];
 function syncHighlight() {
@@ -377,7 +374,6 @@ function placeAnchored() {
   }
 }
 
-// Lane entries: during the build phase, a pin over each road's start says how many foes will come that way.
 // Pins count who is still to come on each road: the whole host in the build phase, then the ones not yet slain.
 function setPins(counts) {
   [...$.pins.children].forEach((el, i) => { el.hidden = !counts[i]; set(el.firstChild, counts[i]); });
@@ -385,7 +381,6 @@ function setPins(counts) {
 function placePins() {
   if (state.phase === 'wave') { const c = lanes.map(() => 0); for (let k = si; k < sched.length; k++) c[sched[k].lane]++; for (const e of state.enemies) c[e.lane]++; setPins(c); }
   else if (state.phase !== 'build') { setPins([]); return; }
-  $.pins.style.visibility = $.bm.classList.contains('open') ? 'hidden' : '';
   lanes.forEach((lane, i) => {
     const el = $.pins.children[i]; if (el.hidden) return;
     proj.copy(lane.pointAt(4)).setY(proj.y + 3).project(camera);
@@ -441,14 +436,11 @@ function refreshHud(realDt) {
     if (!fighting) setPins(lanes.map((_, i) => w ? schedule(n).filter(e => e.lane === i).length : 0));
     $.pvbar.hidden = !fighting;
   }
-  if (fighting) {
-    const left = sched.length - si + state.enemies.length;
-    $.pvfill.style.width = `${100 * (1 - left / Math.max(1, sched.length))}%`;
-  }
+  const left = sched.length - si + state.enemies.length;
+  if (fighting) $.pvfill.style.width = `${100 * (1 - left / Math.max(1, sched.length))}%`;
   const canCall = state.phase === 'build' && state.wave < WAVES.length;
   $.horn.disabled = !canCall; $.horn.classList.toggle('ready', canCall);
   set($.hornlabel, fighting ? 'Battle Joined' : 'Sound the Horn');
-  const left = sched.length - si + state.enemies.length;
   const sub = fighting ? `${left} ${left === 1 ? 'foe remains' : 'foes remain'}`
     : countdown != null ? `${icon('hourglass')}${Math.ceil(countdown)}s<span class="bonus">${icon('coin')}+${Math.round(countdown * EARLY_GOLD_PER_SEC)}</span>`
     : canCall ? (touch ? `Call wave ${n}` : `Call wave ${n} · Space`) : '';
@@ -557,9 +549,7 @@ root.addEventListener('pointerout', e => {
   if (el.dataset.a === 'upgrade') preview = null; else setPreview(null);
 });
 
-let unlocked = false;
-function unlock() { if (!unlocked) { unlocked = true; audio.unlock(); } }
-addEventListener('pointerdown', e => { lastPointer = e.pointerType; unlock(); }, true);
+addEventListener('pointerdown', e => { lastPointer = e.pointerType; audio.unlock(); }, true);
 
 function setupPointer() {
   const el = renderer.domElement;
@@ -572,7 +562,7 @@ function setupPointer() {
     let hit = pickAt(e.clientX, e.clientY);
     if (!hit && e.pointerType !== 'mouse') {
       let best = 24;
-      for (const p of towers.pads) { proj.copy(p.pos).project(camera); const d = Math.hypot((proj.x + 1) / 2 * innerWidth - e.clientX, (1 - proj.y) / 2 * innerHeight - e.clientY); if (proj.z < 1 && d < best) { best = d; hit = p.tower ? { kind: 'tower', tower: p.tower } : { kind: 'pad', pad: p }; } }
+      for (const p of towers.pads) { proj.copy(p.pos).project(camera); const d = Math.hypot((proj.x + 1) / 2 * innerWidth - e.clientX, (1 - proj.y) / 2 * innerHeight - e.clientY); if (proj.z < 1 && d < best) { best = d; hit = siteSel(p); } }
     }
     if (hit && selObj(hit) !== selObj(state.selected)) select(hit); else if (state.selected) deselect();
   });
@@ -583,7 +573,6 @@ function setupPointer() {
 // ── Keyboard site navigation ──
 // With the map focused, Tab / Shift+Tab sweep the build sites around the keep; while one is selected the arrow keys
 // jump to the nearest site in that direction on screen. The camera eases over to keep the choice in view.
-const siteSel = p => p.tower ? { kind: 'tower', tower: p.tower } : { kind: 'pad', pad: p };
 const toScreen = v => { proj.copy(v).project(camera); return [proj.x * innerWidth / 2, -proj.y * innerHeight / 2]; };
 let lastSite = null, navMoved = false;   // so Tab after building carries on from the site just used
 // Tab walks each road from the gate outward, one road after another (sites shared by roads go with the nearest).
@@ -635,7 +624,7 @@ addEventListener('keydown', e => {
 }, true);
 
 addEventListener('keydown', e => {
-  unlock();
+  audio.unlock();
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   const key = e.key.toLowerCase();
   // Title: Space activates the focused button (choose a card); Enter begins the siege, with the focused difficulty.
@@ -683,7 +672,6 @@ export function init() {
   bus.on('tower:build', () => { stats.built++; });
   bus.on('enemy:leak', ({ enemy }) => { stats.leaks[enemy.lane]++; flash($.breach, 'on'); });
   bus.on('tower:sell', ({ tower }) => { if (state.selected?.tower === tower) deselect(); });
-  addEventListener('resize', () => { if (views.overview && !tween && state.phase === 'title') views.overview = null; });
   const again = sessionStorage.getItem('cd-restart');
   if (again && DIFFS[again]) { sessionStorage.removeItem('cd-restart'); requestAnimationFrame(() => startGame(again, true)); }
 }
@@ -721,7 +709,6 @@ export const debug = {
     state.phase = 'build'; state.wave = THREE.MathUtils.clamp(n, 1, WAVES.length) - 1; countdown = null; callWave();
   },
   give: g => { state.gold += g; },
-  view: name => flyTo(name),
   select, deselect,
   preview: id => setPreview(id),
   win: () => endGame(true),

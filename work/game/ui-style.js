@@ -283,7 +283,7 @@ position:fixed;inset:0;pointer-events:none;font-family:var(--serif);color:var(--
 #cd .pin::after{content:"";position:absolute;left:50%;bottom:-6px;margin-left:-6px;border:6px solid transparent;border-bottom:0;border-top-color:#23170d}
 #cd .pin[hidden]{display:none}
 #cd.fighting .pin{opacity:.5}   /* in battle the label steps back so the foes beneath it show */
-#cd.bannered .pin{visibility:hidden}   /* the announcement has the floor while it shows */
+#cd.bannered .pin,#cd.has-sel .pin{visibility:hidden}   /* an announcement, build ring or tower card has the floor */
 #cd .breach{position:absolute;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center,transparent 52%,rgba(150,16,8,.55) 100%)}
 #cd .breach.on{animation:cdBreach .9s ease-out}
 @keyframes cdBreach{0%{opacity:0}12%{opacity:1}100%{opacity:0}}

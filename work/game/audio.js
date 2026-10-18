@@ -319,9 +319,6 @@ async function renderEngine(secs, setup) {
   const c = new OfflineAudioContext(2, Math.ceil(secs * SR), SR), e = createEngine(c); setup(e); return measure(await c.startRendering());
 }
 export const debug = {
-  list: () => Object.keys(SOUNDS),
-  info: () => ({ ctx: ctx?.state ?? 'none', mode, paused, muted, loaded: Object.keys(bank).length, ...vol }),
-  play(name, opts) { unlock(); bankReady.then(() => eng.play(name, opts)); },
   // Offline render of every sound and of the full mix; checks clipping, silence and duration.
   async report() {
     await bankReady;

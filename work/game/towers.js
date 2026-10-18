@@ -626,16 +626,4 @@ export const debug = {
     });
     return state.towers.length;
   },
-  build(padId, typeId, level = 0) {
-    const pad = pads[padId]; if (pad.tower) sellTower(pad.tower);
-    const t = buildTower(pad, typeId, { instant: true, free: true });
-    for (let l = 0; l < level; l++) upgradeTower(t, { instant: true, free: true });
-    for (const s of sinking) if (s._.anim) finishAnim(s);
-    sinking.length = 0;
-    return t;
-  },
-  projectiles: () => projectiles.list.length,
-  burning: () => burning.length,
-  // A damage-free pool of burning pitch at pos (visual check without waiting for a tower to fire).
-  burnAt: (pos, radius = 3, dur = 4) => { const p = pos.clone(); p.y = groundY(p.x, p.z); burning.push({ pos: p, radius, dps: 0, t: 0, dur, tower: { _: { dead: true } }, mesh: poolMesh(p, radius) }); },
 };

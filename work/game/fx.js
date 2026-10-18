@@ -19,7 +19,7 @@ const groundAt = (x, z) => {
 // ───────────────────────────── presets ─────────────────────────────
 // spread: 0 sphere, 1 upper hemisphere, 2 horizontal ring, 3 cone around dir, 4 implode (start on shell, fly inward)
 const P = o => { const p = { n: 1, life: 1, size: 1, grow: 1, speed: 0, spread: 0, cone: .5, up: 0, off: 0, c0: [1, 1, 1], cvar: .12, alpha: 1, fin: .05, fout: 1, add: 0, frame: [0, 1], grav: 0, drag: 0, wind: 0, stretch: 0, spin: [-1, 1], lit: 0, anim: 0, amb: 0, ...o }; p.c1 ||= p.c0; return p; };
-const S = FR.SMOKE, SM3 = [FR.SMOKE, 3];
+const SM3 = [FR.SMOKE, 3];
 const PR = {
   // cannon explosion
   flash: P({ life: [.1, .13], size: [7, 8], grow: 1.4, c0: col('#fff1d0', 7), c1: col('#ffb060', 2), add: 1, fin: .01, fout: 1.5 }),
@@ -698,16 +698,6 @@ const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const fakeEnemy = (p, o = {}) => ({ id: -1, typeId: 'fake', hp: 0, maxHp: 10, alive: false, lane: 0, dist: 0, pos: p, velocity: V(0, 0, 0), radius: .5, height: 1.8, bounty: 8, slowFactor: 1, ...o });
 const fakeTower = (p, typeId) => ({ id: -1, typeId, level: 1, pad: null, pos: p, range: 20, target: null, kills: 0, spent: 0 });
 export const debug = {
-  get particles() { return count; },
-  sets, PR, sample: i => [px[i], py[i], pz[i], age[i], life[i], s0[i], pre[i] === PR.fwSpark],
-  atlas: () => uniforms.uMap.value.image.toDataURL(),
-  get stats() { return { particles: count, decals: dCount, debris: bCount, coins: cCount, damage }; },
-  damage(stage = null) { forcedStage = stage; },
-  fireworks: () => fireworks(12, 4),
-  burst: (name, x, y, z, sc = 1, n) => burst(PR[name], x, y, z, sc, n),
-  fireworkBurst: (x = 4, y = 50, z = 4) => fireworkBurst(x, y, z),
-  lost: () => { forcedStage = 3; heavySmoke(); },
-  explosion: (x, z, r = 3) => explosion(V(x, groundAt(x, z), z), r),
   demo() {
     const L0 = lanes[0], L1 = lanes[1], at = (L, d) => L.pointAt(L.length - d, V(0, 0, 0));
     const emit = (name, data, ms = 0) => setTimeout(() => bus.emit(name, data), ms);
