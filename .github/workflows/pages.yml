@@ -1,6 +1,8 @@
 name: Deploy game to GitHub Pages
 
 on:
+  pull_request:
+    branches: [master]
   push:
     branches: [master]
   workflow_dispatch:
@@ -9,12 +11,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   build:
-    if: github.ref == 'refs/heads/master'
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -30,14 +32,17 @@ jobs:
       - run: node work/towers-test.mjs
       - run: node work/build.mjs
       - name: Prepare website
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
         run: |
           mkdir _site
           cp outputs/castle-defense.html _site/index.html
       - uses: actions/upload-pages-artifact@v4
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
         with:
           path: _site
 
   deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
     needs: build
     runs-on: ubuntu-latest
     permissions:
