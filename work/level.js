@@ -1,3 +1,5 @@
+import { readStored, writeStored } from './storage.js';
+
 // Which level this page load plays. Chosen on the title screen; switching reloads the page (as restart does),
 // because the world is built once at load and every module reads it.
 export const LEVELS = {
@@ -17,8 +19,14 @@ export const LEVELS = {
     won: 'The tide takes the last longship. Saltreach stands, and its beacon burns on into the night.',
   },
 };
-const asked = new URLSearchParams(location.search).get('level') || sessionStorage.getItem('cd-level');
-export const LEVEL = asked in LEVELS ? asked : 'castle';
+const asked = new URLSearchParams(location.search).get('level') || readStored('sessionStorage', 'cd-level');
+export const LEVEL = Object.hasOwn(LEVELS, asked) ? asked : 'castle';
 export const levelInfo = LEVELS[LEVEL];
-// Reload without any ?level= so the stored choice wins.
-export function switchLevel(id, then = null) { if (id === LEVEL || !(id in LEVELS)) return; sessionStorage.setItem('cd-level', id); if (then) sessionStorage.setItem('cd-restart', then); location.replace(location.pathname); }
+export function switchLevel(id, then = null) {
+  if (!Object.hasOwn(LEVELS, id)) return;
+  writeStored('sessionStorage', 'cd-level', id);
+  const url = new URL(location.href);
+  url.searchParams.set('level', id);
+  if (then) url.searchParams.set('start', then); else url.searchParams.delete('start');
+  location.replace(url);
+}

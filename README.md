@@ -85,9 +85,9 @@ The HTML contains the bundled JavaScript, Three.js, shaders, and styles. Models,
 
 ## Play
 
-Choose Dawnhold (`castle`), Frostmere (`frostmere`), or Saltreach (`saltreach`) on the title screen. Select Squire, Knight, or Lord difficulty. Arrow keys choose a focused battlefield or difficulty card, and Enter begins the siege. Loading another battlefield reloads the page.
+Choose Dawnhold (`castle`), Frostmere (`frostmere`), or Saltreach (`saltreach`) on the title screen. Select Squire, Knight, or Lord difficulty. Click or use arrow keys to choose a battlefield and difficulty. Enter or Defend the Keep begins the siege. The selected battlefield loads when the siege begins.
 
-Click or tap a stone build site to choose a tower. Select a tower to upgrade or sell it. Sound the horn early for bonus gold.
+Click or tap a stone build site to choose a tower. Hover or focus a choice to inspect its stats and range. On touch screens, tap a choice to preview it, then tap Build. Select a tower to upgrade or sell it. Selling requires a second press. Sound the horn early for bonus gold.
 
 | Input | Action |
 | --- | --- |
@@ -95,8 +95,8 @@ Click or tap a stone build site to choose a tower. Select a tower to upgrade or 
 | Right-drag or two-finger drag | Pan |
 | Scroll or pinch | Zoom |
 | Double-click | Reframe the camera |
-| Tab / Shift+Tab during play | Move through build sites |
-| Arrow keys with a site selected | Move between sites |
+| Tab / Shift+Tab during play | Move between HUD controls and tower choices |
+| Arrow keys with the battlefield focused | Select and move between build sites |
 | Number keys | Build the corresponding tower on a selected or hovered site |
 | U / S | Upgrade / sell the selected tower |
 | Space | Sound the next wave |
@@ -106,7 +106,7 @@ Click or tap a stone build site to choose a tower. Select a tower to upgrade or 
 | O / Home | Show the battlefield overview |
 | Escape | Close the selection, or toggle pause |
 
-Sound starts after a user interaction. Mute preference and best crown scores per battlefield and difficulty are stored in local storage. Level and difficulty choices use session storage. Hiding the browser tab pauses the siege. Announcements wait while paused or while a build menu or tower card is open.
+Sound starts after a user interaction. Mute preference and best crown scores per battlefield and difficulty are stored in local storage. Level and difficulty choices use session storage. If browser storage is unavailable, the siege remains playable and preferences are not saved. Hiding the browser tab pauses the siege. While paused, battlefield actions are blocked. Restarting or changing battlefield requires a second press to abandon the siege. Announcements wait while paused or while a build menu or tower card is open.
 
 ## Source structure
 
@@ -156,6 +156,7 @@ Build the requested HTML before running browser tools. GPU launch options use Me
 | `node work/shot.mjs <name> <out.png> [--size 1600x900] [--eval "<js>"] [--wait 3000]` | Screenshot a built game; `name` excludes `.html`. |
 | `node work/playtest.mjs [name] [speed] [level]` | Play through via input. Defaults to `castle-defense` and speed `3`. Create `work/shots/play/` first. |
 | `node work/game/audio-test.mjs [name] [level]` | Check synthesized sounds and mixes for clipping, silence, and duration. Default output name is `dev-audio`. |
+| `node work/ux-test.mjs [name]` | Check keyboard focus, pause isolation, tower interactions, touch layouts, results, restart, and storage failures. Defaults to `dev-polish`; build that output first. Saves screenshots and results under `work/shots/ux/<name>/`. |
 | `node work/drive.mjs <steps.mjs> [--size 1440x900] [--level frostmere] [--touch] [--out run] [--html castle-defense]` | Run scripted UX steps and save screenshots under `work/shots/ux/<out>/`. The steps file default-exports an async function receiving `{ page, shot, padXY, wait }`. |
 | `node work/perf.mjs [name] [level]` | Measure GPU rendering cost, draw calls, and triangles during battle. |
 | `node work/perf-full.mjs <before.html> [after.html] [rounds] [report.json]` | Measure complete frames across levels. Defaults to comparing the first file with itself, five rounds, and `/tmp/castle-perf.json`. |
