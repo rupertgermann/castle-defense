@@ -6,7 +6,9 @@ Castle Defense is a browser tower-defense game built with Three.js. Defend the g
 
 ## Publish to GitHub Pages
 
-Every push to `master` runs the build and scheduler checks, builds the game from source, and publishes it to [GitHub Pages](https://rupertgermann.github.io/castle-defense/). A failed check or build prevents deployment, so the previous version stays online.
+Pull requests targeting `master` run the build, scheduler, siege, and tower checks and build the game from source. They do not upload a Pages artifact or deploy. Each pull request has its own concurrency group, separate from publication.
+
+Every push to `master` runs the same checks and build, then publishes the game to [GitHub Pages](https://rupertgermann.github.io/castle-defense/). A failed check or build prevents deployment, so the previous version stays online.
 
 The [deployment workflow](.github/workflows/pages.yml) publishes only the generated game as `index.html`. To republish manually, run **Deploy game to GitHub Pages** from the repository's **Actions** tab with `master` selected.
 
